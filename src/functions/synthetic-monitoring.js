@@ -1,31 +1,47 @@
 let appInsights = require("applicationinsights");
 const axios = require('axios');
+const sslCertificate = require('get-ssl-certificate')
 appInsights.setup().start();
 
 let client = new appInsights.TelemetryClient();
 
-
 const monitoringConfiguration = [
     {
-        "testName" : "aks_ingress",
-        "appName": "microservice_chart",
+        "apiName" : "aks_ingress",
+        "appName": "microservice",
         "url": "https://dev01.blueprint.internal.devopslab.pagopa.it/blueprint/v5-java-helm-complete-test/",
-        "type": "internal",
+        "type": "private",
         "method": "GET",
-        "expectedCodes": ["200-299", "303"]
-
+        "expectedCodes": ["200-299", "303"],
+        "tags": {
+            "description": "AKS ingress tested from internal network"
+        },
     },
     {
-        "testName" : "pagoPA_public_api",
-        "appName": "pagopa_platform",
+        "apiName" : "aks_ingress",
+        "appName": "microservice",
+        "url": "https://dev01.blueprint.internal.devopslab.pagopa.it/blueprint/v5-java-helm-complete-test/",
+        "type": "certificate",
+        "method": "GET",
+        "expectedCodes": ["200-299", "303"],
+        "tags": {
+            "description": "AKS ingress tested from internal network"
+        },
+    },
+    {
+        "apiName" : "pagoPA_public_api",
+        "appName": "pagoPA",
         "url": "https://api.dev.platform.pagopa.it",
         "type": "public",
         "method": "GET",
-        "expectedCodes": ["200"]
+        "expectedCodes": ["200"],
+        "tags": {
+            "description": "pagopa public api tested from internet network"
+        }
 
     },
     {
-        "testName" : "httpbin_public_api",
+        "apiName" : "post",
         "appName": "httpbin",
         "url": "https://httpbin.org/post",
         "type": "public",
@@ -36,8 +52,27 @@ const monitoringConfiguration = [
         },
         "body": {
             "name": "value"
+        },
+        "tags": {
+            "description": "sample post request"
         }
-
+    },
+    {
+        "apiName" : "post",
+        "appName": "httpbin",
+        "url": "https://httpbin.org/get",
+        "type": "private",
+        "method": "GET",
+        "expectedCodes": ["200"],
+        "headers": {
+            "Content-Type": "application/json"
+        },
+        "body": {
+            "name": "value"
+        },
+        "tags": {
+            "description": "sample post request"
+        }
     }
 ]
 
@@ -52,42 +87,87 @@ module.exports = async function (context, myTimer) {
 
 async function testIt(monitoringConfiguration, context){
 
+    let testId = `${monitoringConfiguration.appName}-${monitoringConfiguration.apiName}`
+
     context.log(`preparing test of ${JSON.stringify(monitoringConfiguration)}`)
 
     let properties = {}
     properties['appName'] = monitoringConfiguration.appName
+    properties['apiName'] = monitoringConfiguration.apiName
+    properties['endpoint'] = `${monitoringConfiguration.method} ${monitoringConfiguration.url}`
+
+    for (const [key, value] of Object.entries(monitoringConfiguration.tags)) {
+      properties[key] = value;
+    }
 
     let telemetryData =  {
-        id: monitoringConfiguration.testName, 
+        id: `synthetic_${testId}`,
         message: "",
-        success : false, 
-        name: `${monitoringConfiguration.testName}_${monitoringConfiguration.appName}_${monitoringConfiguration.type}`,
-        runLocation: "northeurope", 
+        success : false,
+        name: `synthetic_${testId}`,
+        runLocation: monitoringConfiguration.type,
         properties: properties
     };
 
+    
+    let result = {};
+    if (monitoringConfiguration.type == "certificate"){
+        result = await checkCert(monitoringConfiguration, context);
+    }else{
+        result = await checkApi(monitoringConfiguration, context);
+    }
+
+    //merge monitoring results
+    for (const [key, value] of Object.entries(result)) {
+        telemetryData[key] = value;
+    }
+
+    
+    context.log(`test ${testId}_${monitoringConfiguration.type}, telemetry: ${JSON.stringify(telemetryData)}`)
+    client.trackAvailability(telemetryData);
+}
+
+async function checkCert(monitoringConfiguration, context){
+    let telemetryData = {}
+    let elapsedMillis = 0;
+    const start = Date.now();
+    try{
+        let certResponse = await sslCertificate.get(monitoringConfiguration.url.replace(/(^\w+:|^)\/\//, '')); //strip schema
+        elapsedMillis = Date.now() - start;
+        let validTo = new Date(certResponse.valid_to);
+        const millisToExpiration = validTo-start;
+        telemetryData['success'] = millisToExpiration > 604800000; //7 days in millis
+    }catch (error){
+        elapsedMillis = Date.now() - start;
+        context.log(`error: ${JSON.stringify(error)}`);
+        telemetryData['message'] = error.message
+    }
+    telemetryData['duration'] = elapsedMillis;
+        
+    return telemetryData;
+}
+
+
+async function checkApi(monitoringConfiguration, context){
+    let telemetryData = {}
     let elapsedMillis = 0;
     const start = Date.now();
     try{
         let response = await axios( buildRequest(monitoringConfiguration));
         elapsedMillis = Date.now() - start;
 
-        context.log(`test: ${monitoringConfiguration.testName}, response: ${response.status}`);
-        context.log(`cert: ${response.request.res.socket.getPeerCertificate(false)}`);
+        context.log(`response: ${response.status}`);
         telemetryData['success'] = isStatusCodeAccepted(response.status, monitoringConfiguration.expectedCodes);
         telemetryData['message'] = `${response.statusText}`
 
     }catch (error){
         elapsedMillis = Date.now() - start;
-        context.log(`test: ${monitoringConfiguration.testName}, error: ${JSON.stringify(error)}`);
+        context.log(`error: ${JSON.stringify(error)}`);
         telemetryData['message'] = error.message
     }
-    
     telemetryData['duration'] = elapsedMillis;
 
-    context.log(`test ${monitoringConfiguration.testName}, telemetry: ${JSON.stringify(telemetryData)}`)
-
-    client.trackAvailability(telemetryData);
+    return telemetryData
 }
 
 function buildRequest(monitoringConfiguration){
