@@ -21,7 +21,8 @@ const monitoringConfiguration = [
         "apiName" : "aks_ingress",
         "appName": "microservice",
         "url": "https://dev01.blueprint.internal.devopslab.pagopa.it/blueprint/v5-java-helm-complete-test/",
-        "type": "certificate",
+        "type": "private",
+        "checkCertificate": true,
         "method": "GET",
         "expectedCodes": ["200-299", "303"],
         "tags": {
@@ -73,6 +74,43 @@ const monitoringConfiguration = [
         "tags": {
             "description": "sample post request"
         }
+    },
+    ,
+    {
+        "apiName" : "post",
+        "appName": "httpbin",
+        "url": "https://httpbin.org/post",
+        "type": "public",
+        "method": "POST",
+        "checkCertificate": true,
+        "expectedCodes": ["200"],
+        "headers": {
+            "Content-Type": "application/json"
+        },
+        "body": {
+            "name": "value"
+        },
+        "tags": {
+            "description": "sample post request"
+        }
+    },
+    {
+        "apiName" : "post",
+        "appName": "httpbin",
+        "url": "https://httpbin.org/get",
+        "type": "private",
+        "checkCertificate": true,
+        "method": "GET",
+        "expectedCodes": ["200"],
+        "headers": {
+            "Content-Type": "application/json"
+        },
+        "body": {
+            "name": "value"
+        },
+        "tags": {
+            "description": "sample post request"
+        }
     }
 ]
 
@@ -86,10 +124,34 @@ module.exports = async function (context, myTimer) {
 
 
 async function testIt(monitoringConfiguration, context){
-
-    let testId = `${monitoringConfiguration.appName}-${monitoringConfiguration.apiName}`
-
     context.log(`preparing test of ${JSON.stringify(monitoringConfiguration)}`)
+
+    let telemetryData =  initTelemetry(monitoringConfiguration);
+    
+    let result = await checkApi(monitoringConfiguration, context);
+    sendTelemetry(client, telemetryData, result, context);
+
+
+    if (monitoringConfiguration.checkCertificate){
+        context.log(`checking certificate...`)
+        let certResult = await checkCert(monitoringConfiguration, context);
+        sendTelemetry(client, telemetryData, certResult, context);
+    }
+
+}  
+
+function sendTelemetry(client, baseData, checkResult, context){
+    //merge monitoring results
+    for (const [key, value] of Object.entries(checkResult)) {
+        baseData[key] = value;
+    }
+    context.log(`tracking telemetry: ${JSON.stringify(baseData)}`)
+    client.trackAvailability(baseData);
+}
+
+
+function initTelemetry(monitoringConfiguration){
+    let testId = `${monitoringConfiguration.appName}-${monitoringConfiguration.apiName}`
 
     let properties = {}
     properties['appName'] = monitoringConfiguration.appName
@@ -109,23 +171,9 @@ async function testIt(monitoringConfiguration, context){
         properties: properties
     };
 
-    
-    let result = {};
-    if (monitoringConfiguration.type == "certificate"){
-        result = await checkCert(monitoringConfiguration, context);
-    }else{
-        result = await checkApi(monitoringConfiguration, context);
-    }
-
-    //merge monitoring results
-    for (const [key, value] of Object.entries(result)) {
-        telemetryData[key] = value;
-    }
-
-    
-    context.log(`test ${testId}_${monitoringConfiguration.type}, telemetry: ${JSON.stringify(telemetryData)}`)
-    client.trackAvailability(telemetryData);
+    return telemetryData;
 }
+
 
 async function checkCert(monitoringConfiguration, context){
     let telemetryData = {}
@@ -143,6 +191,7 @@ async function checkCert(monitoringConfiguration, context){
         telemetryData['message'] = error.message
     }
     telemetryData['duration'] = elapsedMillis;
+    telemetryData['runLocation'] = `${monitoringConfiguration.type}-cert`
         
     return telemetryData;
 }
