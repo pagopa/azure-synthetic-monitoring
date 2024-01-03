@@ -1,9 +1,23 @@
 let appInsights = require("applicationinsights");
 const axios = require('axios');
 const sslCertificate = require('get-ssl-certificate')
+const tls = require('tls');
 appInsights.setup().start();
 
 let client = new appInsights.TelemetryClient();
+
+const keysForTelemetry = ['success', 'message', 'duration', 'runLocation'];
+const keysForEvent = ['duration', 'targetStatus', 'targetExpirationTimestamp', 'httpStatus', 'targetTlsVersion'] ;
+
+
+axios.interceptors.response.use(function (response) {
+    //adding tsl version to response
+    response['TSL_VERSION'] = response.request.res.socket.getProtocol()
+    return response;
+  }, function (error) {
+    //nothing to do
+    return Promise.reject(error);
+  });
 
 const monitoringConfiguration = [
     {
@@ -114,11 +128,13 @@ const monitoringConfiguration = [
     }
 ]
 
+
+
+
 module.exports = async function (context, myTimer) {
     for(idx in monitoringConfiguration){
         await testIt(monitoringConfiguration[idx], context);
     }
-
     context.log('Monitoring run completed');
 };
 
@@ -126,37 +142,65 @@ module.exports = async function (context, myTimer) {
 async function testIt(monitoringConfiguration, context){
     context.log(`preparing test of ${JSON.stringify(monitoringConfiguration)}`)
 
-    let telemetryData =  initTelemetry(monitoringConfiguration);
-    
-    let result = await checkApi(monitoringConfiguration, context);
-    sendTelemetry(client, telemetryData, result, context);
+    let metricObjects =  initMetricObjects(monitoringConfiguration);
 
+    let telemetryData = metricObjects.telemetry;
+    let eventData = metricObjects.event;
+
+    let result = await checkApi(monitoringConfiguration, context);
+    eventData = enrichEvent(eventData, result)
+
+    sendTelemetry(client, telemetryData, result, context);
 
     if (monitoringConfiguration.checkCertificate){
         context.log(`checking certificate...`)
         let certResult = await checkCert(monitoringConfiguration, context);
+        eventData = enrichEvent(eventData, result);
         sendTelemetry(client, telemetryData, certResult, context);
     }
 
-}  
+    sendEvent(client, eventData, context);
+
+}
+
+function enrichEvent(baseEvent, checkResult){
+    let enrichedMeasurements = enrichData(baseEvent.measurements, checkResult, keysForEvent)
+    baseEvent['measurements'] = enrichedMeasurements
+    return baseEvent;
+}
+
+function enrichData(baseData, checkResult, keyList){
+    //merge monitoring results
+    for (const [key, value] of Object.entries(checkResult)) {
+        if(keyList.includes(key)){
+            baseData[key] = value;
+        }
+    }
+    return baseData;
+}
+
+function sendEvent(client, event, context){
+    context.log(`tracking event: ${JSON.stringify(event)}`)
+    client.trackEvent(event);
+}
 
 function sendTelemetry(client, baseData, checkResult, context){
     //merge monitoring results
-    for (const [key, value] of Object.entries(checkResult)) {
-        baseData[key] = value;
-    }
+    baseData = enrichData(baseData, checkResult, keysForTelemetry);
     context.log(`tracking telemetry: ${JSON.stringify(baseData)}`)
     client.trackAvailability(baseData);
 }
 
 
-function initTelemetry(monitoringConfiguration){
+function initMetricObjects(monitoringConfiguration){
     let testId = `${monitoringConfiguration.appName}-${monitoringConfiguration.apiName}`
 
     let properties = {}
     properties['appName'] = monitoringConfiguration.appName
     properties['apiName'] = monitoringConfiguration.apiName
     properties['endpoint'] = `${monitoringConfiguration.method} ${monitoringConfiguration.url}`
+
+    let measurements = {}
 
     for (const [key, value] of Object.entries(monitoringConfiguration.tags)) {
       properties[key] = value;
@@ -171,7 +215,17 @@ function initTelemetry(monitoringConfiguration){
         properties: properties
     };
 
-    return telemetryData;
+    let eventData = {
+        name: `synthetic_${testId}_${monitoringConfiguration.type}`,
+        measurements: measurements,
+        properties: properties
+
+     }
+
+    return {
+        'telemetry': telemetryData,
+        'event': eventData
+    };
 }
 
 
@@ -185,6 +239,7 @@ async function checkCert(monitoringConfiguration, context){
         let validTo = new Date(certResponse.valid_to);
         const millisToExpiration = validTo-start;
         telemetryData['success'] = millisToExpiration > 604800000; //7 days in millis
+        telemetryData['targetExpirationTimestamp'] = validTo.getTime();
     }catch (error){
         elapsedMillis = Date.now() - start;
         context.log(`error: ${JSON.stringify(error)}`);
@@ -192,13 +247,14 @@ async function checkCert(monitoringConfiguration, context){
     }
     telemetryData['duration'] = elapsedMillis;
     telemetryData['runLocation'] = `${monitoringConfiguration.type}-cert`
-        
+
     return telemetryData;
 }
 
 
 async function checkApi(monitoringConfiguration, context){
     let telemetryData = {}
+    telemetryData['targetStatus'] = 0
     let elapsedMillis = 0;
     const start = Date.now();
     try{
@@ -206,9 +262,12 @@ async function checkApi(monitoringConfiguration, context){
         elapsedMillis = Date.now() - start;
 
         context.log(`response: ${response.status}`);
+
         telemetryData['success'] = isStatusCodeAccepted(response.status, monitoringConfiguration.expectedCodes);
         telemetryData['message'] = `${response.statusText}`
-
+        telemetryData['httpStatus'] = response.status
+        telemetryData['targetStatus'] = isStatusCodeAccepted(response.status, monitoringConfiguration.expectedCodes) ? 1 : 0
+        telemetryData['targetTlsVersion'] = Number(extractTlsVersion(response['TSL_VERSION']));
     }catch (error){
         elapsedMillis = Date.now() - start;
         context.log(`error: ${JSON.stringify(error)}`);
@@ -219,10 +278,21 @@ async function checkApi(monitoringConfiguration, context){
     return telemetryData
 }
 
+function extractTlsVersion(versionString){
+    // Utilizza una espressione regolare per estrarre la parte numerica
+    const numericPart = versionString.match(/\d+(\.\d+)?/);
+
+    // Verifica se è stata trovata una corrispondenza e ottieni il valore
+    return numericPart ? numericPart[0] : null;
+}
+
 function buildRequest(monitoringConfiguration){
     let request = {
             method: monitoringConfiguration.method.toLowerCase(),
-            url: monitoringConfiguration.url
+            url: monitoringConfiguration.url,
+            validateStatus: function (status) {
+                return true; //every status code should be treated as a valid code (it will be checked later)
+            }
     }
 
     if (monitoringConfiguration.headers) {
