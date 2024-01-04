@@ -1,7 +1,6 @@
 let appInsights = require("applicationinsights");
 const axios = require('axios');
 const sslCertificate = require('get-ssl-certificate')
-const tls = require('tls');
 appInsights.setup().start();
 
 let client = new appInsights.TelemetryClient();
@@ -9,16 +8,29 @@ let client = new appInsights.TelemetryClient();
 const keysForTelemetry = ['success', 'message', 'duration', 'runLocation'];
 const keysForEvent = ['duration', 'targetStatus', 'targetExpirationTimestamp', 'httpStatus', 'targetTlsVersion', 'targetExpireInDays'] ;
 const keysForEventProperties = ['domain', 'checkCert'] ;
-
+const TLS_VERSION_KEY = "TLS_VERSION"
+const START_TIMESTAMP_KEY = "x-request-timestamp"
+const RESPONSE_TIME_KEY = "RESPONSE_TIME"
 
 axios.interceptors.response.use(function (response) {
-    //adding tsl version to response
-    response['TSL_VERSION'] = response.request.res.socket.getProtocol()
+    //adding tls version to response
+    response[TLS_VERSION_KEY] = response.request.res.socket.getProtocol()
+    response[RESPONSE_TIME_KEY] = Date.now() - response.config.headers[START_TIMESTAMP_KEY]
     return response;
   }, function (error) {
     //nothing to do
     return Promise.reject(error);
   });
+
+axios.interceptors.request.use(
+    (config) => {
+      config.headers[START_TIMESTAMP_KEY] = Date.now();
+      return config;
+    },
+    (error) => {
+      return Promise.reject(error);
+    }
+  );
 
 const monitoringConfiguration = [
     {
@@ -79,12 +91,15 @@ const monitoringConfiguration = [
 ]
 
 
-
-
 module.exports = async function (context, myTimer) {
+    let tests = []
     for(idx in monitoringConfiguration){
-        await testIt(monitoringConfiguration[idx], context);
+        tests.push(testIt(monitoringConfiguration[idx], context).catch((error) => {
+            context.error(`error in test for ${monitoringConfiguration[idx]}: ${JSON.stringify(error)}`)
+        }));
     }
+
+    await Promise.all(tests)
     context.log('Monitoring run completed');
 };
 
@@ -94,57 +109,200 @@ async function testIt(monitoringConfiguration, context){
 
     let metricObjects =  initMetricObjects(monitoringConfiguration);
 
-    let telemetryData = metricObjects.telemetry;
-    let eventData = metricObjects.event;
-
-    let result = await checkApi(monitoringConfiguration, context);
-    eventData = enrichEvent(eventData, result)
-
-    sendTelemetry(client, telemetryData, result, context);
-
-    if (monitoringConfiguration.checkCertificate){
-        context.log(`checking certificate...`)
-        let certResult = await checkCert(monitoringConfiguration, context);
-        eventData = enrichEvent(eventData, certResult);
-        sendTelemetry(client, telemetryData, certResult, context);
+    let metricContex = {
+        baseTelemetryData : metricObjects.telemetry,
+        baseEventData : metricObjects.event,
+        monitoringConfiguration: monitoringConfiguration,
+        apiMetrics: null,
+        certMetrics: null
     }
 
-    sendEvent(client, eventData, context);
+    return checkApi(metricContex, context)
+    .then(certChecker(context))
+    .then(telemetrySender(client, context))
+    .then(eventSender(client, context))
 
 }
 
-function enrichEvent(baseEvent, checkResult){
-    let enrichedMeasurements = enrichData(baseEvent.measurements, checkResult, keysForEvent)
-    baseEvent['measurements'] = enrichedMeasurements
-    let enrichedProperties = enrichData(baseEvent.properties, checkResult, keysForEventProperties)
-    baseEvent['properties'] = enrichedProperties
-    return baseEvent;
+
+
+function eventSender(client, context){
+    return async function(metricContext){
+        context.log(`sending event for ${metricContext.monitoringConfiguration.method} ${metricContext.monitoringConfiguration.url}`)
+        let enrichedMeasurements = enrichData(metricContext.baseEventData.measurements, metricContext.apiMetrics, keysForEvent)
+        let enrichedProperties = enrichData(metricContext.baseEventData.properties, metricContext.apiMetrics, keysForEventProperties)
+        if (metricContext.certMetrics){
+            enrichedMeasurements = enrichData(enrichedMeasurements, metricContext.certMetrics, keysForEvent)
+            enrichedProperties = enrichData(enrichedProperties, metricContext.certMetrics, keysForEventProperties)
+        }
+        metricContext.baseEventData['measurements'] = enrichedMeasurements
+        metricContext.baseEventData['properties'] = enrichedProperties
+
+        context.log(`event for ${metricContext.monitoringConfiguration.method} ${metricContext.monitoringConfiguration.url}: ${JSON.stringify(metricContext.baseEventData)}`)
+        client.trackEvent(metricContext.baseEventData);
+
+        return metricContext;
+    }
 }
-
-
 
 
 function enrichData(baseData, checkResult, keyList){
+    let newData = {...baseData} //create a clone
     //merge monitoring results
     for (const [key, value] of Object.entries(checkResult)) {
         if(keyList.includes(key)){
-            baseData[key] = value;
+            newData[key] = value;
         }
     }
-    return baseData;
+    return newData;
 }
 
-function sendEvent(client, event, context){
-    context.log(`tracking event: ${JSON.stringify(event)}`)
-    client.trackEvent(event);
+
+function telemetrySender(client, context){
+    return async function(metricContext){
+        //merge monitoring results and send
+        context.log(`sending telemetry for ${metricContext.monitoringConfiguration.method} ${metricContext.monitoringConfiguration.url}`)
+        if (metricContext.apiMetrics){
+            let apiTelemetryData = enrichData(metricContext.baseTelemetryData, metricContext.apiMetrics, keysForTelemetry);
+            context.log(`tracking api telemetry for ${metricContext.monitoringConfiguration.method} ${metricContext.monitoringConfiguration.url} : ${JSON.stringify(apiTelemetryData)}`)
+            client.trackAvailability(apiTelemetryData);
+        }
+        
+        if (metricContext.certMetrics){
+            let certTelemetryData = enrichData(metricContext.baseTelemetryData, metricContext.certMetrics, keysForTelemetry);
+            context.log(`tracking cert telemetry for ${metricContext.monitoringConfiguration.method} ${metricContext.monitoringConfiguration.url}: ${JSON.stringify(certTelemetryData)}`)
+            client.trackAvailability(certTelemetryData);
+        }
+
+        return metricContext
+    }
 }
 
-function sendTelemetry(client, baseData, checkResult, context){
-    //merge monitoring results
-    baseData = enrichData(baseData, checkResult, keysForTelemetry);
-    context.log(`tracking telemetry: ${JSON.stringify(baseData)}`)
-    client.trackAvailability(baseData);
+
+
+function certChecker(context){
+    return async function checkCert(metricContext){
+        context.log(`checking certificate of ${metricContext.monitoringConfiguration.method} ${metricContext.monitoringConfiguration.url}? ${metricContext.monitoringConfiguration.checkCertificate}`)
+        if (metricContext.monitoringConfiguration.checkCertificate){
+            let url = new URL(metricContext.monitoringConfiguration.url)
+            metricContext.certMetrics = {
+                domain: url.host,
+                checkCert: true
+            }
+    
+            return sslCertificate.get(url.host)
+                .then(certResponseElaborator(metricContext, context))
+                .catch(certErrorElaborator(metricContext, context))
+        } else {
+            return metricContext
+        }
+    }
 }
+
+
+function toPromise(myObject){
+    return new Promise((resolve, reject) => {
+        resolve(myObject);
+      })
+}
+
+function certResponseElaborator(metricContext, context){
+    return async function(certResponse){
+        context.log(`cert response of ${metricContext.monitoringConfiguration.method} ${metricContext.monitoringConfiguration.url} valid to ${certResponse.valid_to}`)
+        let validTo = new Date(certResponse.valid_to);
+        const millisToExpiration = validTo - Date.now();
+        metricContext.certMetrics['success'] = millisToExpiration > 604800000; //7 days in millis
+        metricContext.certMetrics['targetExpireInDays'] = Math.floor(millisToExpiration / 86400000); //convert in days
+        metricContext.certMetrics['targetExpirationTimestamp'] = validTo.getTime();
+        metricContext.certMetrics['runLocation'] = `${metricContext.monitoringConfiguration.type}-cert`
+
+        return metricContext
+    }
+}
+
+function certErrorElaborator(metricContext, context){
+    return async function(error){
+        context.log(`cert error of ${metricContext.monitoringConfiguration.method} ${metricContext.monitoringConfiguration.url}: ${JSON.stringify(error)}`)
+        metricContext.certMetrics['message'] = error.message
+        metricContext.certMetrics['runLocation'] = `${metricContext.monitoringConfiguration.type}-cert`
+        metricContext.certMetrics['success'] = false
+
+        return metricContext
+    }
+}
+
+function apiResponseElaborator(metricContext, context){
+    return async function(response){
+        context.log(`api response for ${metricContext.monitoringConfiguration.method} ${metricContext.monitoringConfiguration.url}: ${response.status}`)
+        let apiMetrics = {}
+
+        let statusCodeOk = isStatusCodeAccepted(response.status, metricContext.monitoringConfiguration.expectedCodes)
+
+        apiMetrics['duration'] = response[RESPONSE_TIME_KEY];
+        apiMetrics['success'] = statusCodeOk;
+        apiMetrics['message'] = `${response.statusText}`
+        apiMetrics['httpStatus'] = response.status
+        apiMetrics['targetStatus'] = statusCodeOk ? 1 : 0
+        apiMetrics['targetTlsVersion'] = Number(extractTlsVersion(response[TLS_VERSION_KEY]));
+
+        metricContext.apiMetrics = apiMetrics
+
+        return metricContext
+    }
+}
+
+function apiErrorElaborator(metricContext, context){
+    return async function(error){
+        context.log(`api error of ${metricContext.monitoringConfiguration.method} ${metricContext.monitoringConfiguration.url}: ${JSON.stringify(error)}`)
+        let elapsedMillis = Date.now() - metricContext['startTime'];
+        
+        let apiMetrics = {}
+        apiMetrics['message'] = error.message
+        apiMetrics['duration'] = elapsedMillis;
+        apiMetrics['success'] = false;
+        apiMetrics['targetStatus'] = 0
+        metricContext.apiMetrics = apiMetrics
+        return metricContext
+    }
+}
+
+async function checkApi(metricContext, context){
+    metricContext['startTime'] = Date.now();
+    context.log(`check api of ${metricContext.monitoringConfiguration.method} ${metricContext.monitoringConfiguration.url}`)
+    return axios(buildRequest(metricContext.monitoringConfiguration))
+        .then(apiResponseElaborator(metricContext, context))
+        .catch(apiErrorElaborator(metricContext, context))
+}
+
+
+function extractTlsVersion(versionString){
+    // Utilizza una espressione regolare per estrarre la parte numerica
+    const numericPart = versionString.match(/\d+(\.\d+)?/);
+
+    // Verifica se è stata trovata una corrispondenza e ottieni il valore
+    return numericPart ? numericPart[0] : null;
+}
+
+function buildRequest(monitoringConfiguration){
+    let request = {
+            method: monitoringConfiguration.method.toLowerCase(),
+            url: monitoringConfiguration.url,
+            validateStatus: function (status) {
+                return true; //every status code should be treated as a valid code (it will be checked later)
+            }
+    }
+
+    if (monitoringConfiguration.headers) {
+        request['headers'] = monitoringConfiguration.headers
+    }
+
+    if (["post", "put", "delete", "patch"].includes(monitoringConfiguration.method.toLowerCase())){
+        request['data']= monitoringConfiguration.body;
+    }
+
+    return request;
+}
+
 
 
 function initMetricObjects(monitoringConfiguration){
@@ -182,89 +340,6 @@ function initMetricObjects(monitoringConfiguration){
         'event': eventData
     };
 }
-
-
-async function checkCert(monitoringConfiguration, context){
-    let telemetryData = {}
-    let elapsedMillis = 0;
-    const start = Date.now();
-    try{
-        let url = new URL(monitoringConfiguration.url)
-        telemetryData['domain'] = url.host
-        telemetryData['checkCert'] = true
-        let certResponse = await sslCertificate.get(url.host);
-        elapsedMillis = Date.now() - start;
-        let validTo = new Date(certResponse.valid_to);
-        const millisToExpiration = validTo - start;
-        telemetryData['success'] = millisToExpiration > 604800000; //7 days in millis
-        telemetryData['targetExpireInDays'] = Math.floor(millisToExpiration / 86400000); //convert in days
-        telemetryData['targetExpirationTimestamp'] = validTo.getTime();
-    }catch (error){
-        elapsedMillis = Date.now() - start;
-        context.log(`error: ${JSON.stringify(error)}`);
-        telemetryData['message'] = error.message
-    }
-    telemetryData['duration'] = elapsedMillis;
-    telemetryData['runLocation'] = `${monitoringConfiguration.type}-cert`
-
-    return telemetryData;
-}
-
-
-async function checkApi(monitoringConfiguration, context){
-    let telemetryData = {}
-    telemetryData['targetStatus'] = 0
-    let elapsedMillis = 0;
-    const start = Date.now();
-    try{
-        let response = await axios( buildRequest(monitoringConfiguration));
-        elapsedMillis = Date.now() - start;
-
-        context.log(`response: ${response.status}`);
-
-        telemetryData['success'] = isStatusCodeAccepted(response.status, monitoringConfiguration.expectedCodes);
-        telemetryData['message'] = `${response.statusText}`
-        telemetryData['httpStatus'] = response.status
-        telemetryData['targetStatus'] = isStatusCodeAccepted(response.status, monitoringConfiguration.expectedCodes) ? 1 : 0
-        telemetryData['targetTlsVersion'] = Number(extractTlsVersion(response['TSL_VERSION']));
-    }catch (error){
-        elapsedMillis = Date.now() - start;
-        context.log(`error: ${JSON.stringify(error)}`);
-        telemetryData['message'] = error.message
-    }
-    telemetryData['duration'] = elapsedMillis;
-
-    return telemetryData
-}
-
-function extractTlsVersion(versionString){
-    // Utilizza una espressione regolare per estrarre la parte numerica
-    const numericPart = versionString.match(/\d+(\.\d+)?/);
-
-    // Verifica se è stata trovata una corrispondenza e ottieni il valore
-    return numericPart ? numericPart[0] : null;
-}
-
-function buildRequest(monitoringConfiguration){
-    let request = {
-            method: monitoringConfiguration.method.toLowerCase(),
-            url: monitoringConfiguration.url,
-            validateStatus: function (status) {
-                return true; //every status code should be treated as a valid code (it will be checked later)
-            }
-    }
-
-    if (monitoringConfiguration.headers) {
-        request['headers'] = monitoringConfiguration.headers
-    }
-
-    if (["post", "put", "delete", "patch"].includes(monitoringConfiguration.method.toLowerCase())){
-        request['data']= monitoringConfiguration.body;
-    }
-
-    return request;
-}
-
 
 function isStatusCodeAccepted(statusCode, acceptedCodes){
     let accepted = false;
