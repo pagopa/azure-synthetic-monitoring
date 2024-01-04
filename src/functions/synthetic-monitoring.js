@@ -7,7 +7,8 @@ appInsights.setup().start();
 let client = new appInsights.TelemetryClient();
 
 const keysForTelemetry = ['success', 'message', 'duration', 'runLocation'];
-const keysForEvent = ['duration', 'targetStatus', 'targetExpirationTimestamp', 'httpStatus', 'targetTlsVersion'] ;
+const keysForEvent = ['duration', 'targetStatus', 'targetExpirationTimestamp', 'httpStatus', 'targetTlsVersion', 'targetExpireInDays'] ;
+const keysForEventProperties = ['domain', 'checkCert'] ;
 
 
 axios.interceptors.response.use(function (response) {
@@ -25,17 +26,6 @@ const monitoringConfiguration = [
         "appName": "microservice",
         "url": "https://dev01.blueprint.internal.devopslab.pagopa.it/blueprint/v5-java-helm-complete-test/",
         "type": "private",
-        "method": "GET",
-        "expectedCodes": ["200-299", "303"],
-        "tags": {
-            "description": "AKS ingress tested from internal network"
-        },
-    },
-    {
-        "apiName" : "aks_ingress",
-        "appName": "microservice",
-        "url": "https://dev01.blueprint.internal.devopslab.pagopa.it/blueprint/v5-java-helm-complete-test/",
-        "type": "private",
         "checkCertificate": true,
         "method": "GET",
         "expectedCodes": ["200-299", "303"],
@@ -48,6 +38,7 @@ const monitoringConfiguration = [
         "appName": "pagoPA",
         "url": "https://api.dev.platform.pagopa.it",
         "type": "public",
+        "checkCertificate": true,
         "method": "GET",
         "expectedCodes": ["200"],
         "tags": {
@@ -61,41 +52,6 @@ const monitoringConfiguration = [
         "url": "https://httpbin.org/post",
         "type": "public",
         "method": "POST",
-        "expectedCodes": ["200"],
-        "headers": {
-            "Content-Type": "application/json"
-        },
-        "body": {
-            "name": "value"
-        },
-        "tags": {
-            "description": "sample post request"
-        }
-    },
-    {
-        "apiName" : "post",
-        "appName": "httpbin",
-        "url": "https://httpbin.org/get",
-        "type": "private",
-        "method": "GET",
-        "expectedCodes": ["200"],
-        "headers": {
-            "Content-Type": "application/json"
-        },
-        "body": {
-            "name": "value"
-        },
-        "tags": {
-            "description": "sample post request"
-        }
-    },
-    ,
-    {
-        "apiName" : "post",
-        "appName": "httpbin",
-        "url": "https://httpbin.org/post",
-        "type": "public",
-        "method": "POST",
         "checkCertificate": true,
         "expectedCodes": ["200"],
         "headers": {
@@ -109,19 +65,13 @@ const monitoringConfiguration = [
         }
     },
     {
-        "apiName" : "post",
+        "apiName" : "get",
         "appName": "httpbin",
         "url": "https://httpbin.org/get",
         "type": "private",
         "checkCertificate": true,
         "method": "GET",
         "expectedCodes": ["200"],
-        "headers": {
-            "Content-Type": "application/json"
-        },
-        "body": {
-            "name": "value"
-        },
         "tags": {
             "description": "sample post request"
         }
@@ -155,7 +105,7 @@ async function testIt(monitoringConfiguration, context){
     if (monitoringConfiguration.checkCertificate){
         context.log(`checking certificate...`)
         let certResult = await checkCert(monitoringConfiguration, context);
-        eventData = enrichEvent(eventData, result);
+        eventData = enrichEvent(eventData, certResult);
         sendTelemetry(client, telemetryData, certResult, context);
     }
 
@@ -166,8 +116,13 @@ async function testIt(monitoringConfiguration, context){
 function enrichEvent(baseEvent, checkResult){
     let enrichedMeasurements = enrichData(baseEvent.measurements, checkResult, keysForEvent)
     baseEvent['measurements'] = enrichedMeasurements
+    let enrichedProperties = enrichData(baseEvent.properties, checkResult, keysForEventProperties)
+    baseEvent['properties'] = enrichedProperties
     return baseEvent;
 }
+
+
+
 
 function enrichData(baseData, checkResult, keyList){
     //merge monitoring results
@@ -234,11 +189,15 @@ async function checkCert(monitoringConfiguration, context){
     let elapsedMillis = 0;
     const start = Date.now();
     try{
-        let certResponse = await sslCertificate.get(monitoringConfiguration.url.replace(/(^\w+:|^)\/\//, '')); //strip schema
+        let url = new URL(monitoringConfiguration.url)
+        telemetryData['domain'] = url.host
+        telemetryData['checkCert'] = true
+        let certResponse = await sslCertificate.get(url.host);
         elapsedMillis = Date.now() - start;
         let validTo = new Date(certResponse.valid_to);
-        const millisToExpiration = validTo-start;
+        const millisToExpiration = validTo - start;
         telemetryData['success'] = millisToExpiration > 604800000; //7 days in millis
+        telemetryData['targetExpireInDays'] = Math.floor(millisToExpiration / 86400000); //convert in days
         telemetryData['targetExpirationTimestamp'] = validTo.getTime();
     }catch (error){
         elapsedMillis = Date.now() - start;
