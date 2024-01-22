@@ -112,9 +112,6 @@ const monitoringConfiguration = [
 
 
 module.exports = async function (context, myTimer) {
-
-    
-
     let tests = []
     for(idx in monitoringConfiguration){
         tests.push(testIt(monitoringConfiguration[idx], context).catch((error) => {
@@ -189,7 +186,7 @@ function telemetrySender(client, context){
             context.log(`tracking api telemetry for ${metricContext.testId} : ${JSON.stringify(apiTelemetryData)}`)
             client.trackAvailability(apiTelemetryData);
         }
-        
+
         if (metricContext.certMetrics){
             let certTelemetryData = enrichData(metricContext.baseTelemetryData, metricContext.certMetrics, keysForTelemetry);
             context.log(`tracking cert telemetry for ${metricContext.testId}: ${JSON.stringify(certTelemetryData)}`)
@@ -206,7 +203,7 @@ function certChecker(context){
     return async function checkCert(metricContext){
         context.log(`checking certificate for ${metricContext.testId}? ${metricContext.monitoringConfiguration.checkCertificate}`)
         let url = new URL(metricContext.monitoringConfiguration.url)
-        
+
         metricContext.certMetrics = {
             domain: url.host,
             checkCert: metricContext.monitoringConfiguration.checkCertificate
@@ -229,7 +226,7 @@ function certResponseElaborator(metricContext, context){
         let validTo = new Date(certResponse.valid_to);
         const millisToExpiration = validTo - Date.now();
         metricContext.certMetrics['success'] = millisToExpiration > 604800000; //7 days in millis
-        metricContext.certMetrics['certSuccess'] = 
+        metricContext.certMetrics['certSuccess'] =
         metricContext.certMetrics['targetExpireInDays'] = Math.floor(millisToExpiration / 86400000); //convert in days
         metricContext.certMetrics['targetExpirationTimestamp'] = validTo.getTime();
         metricContext.certMetrics['runLocation'] = `${metricContext.monitoringConfiguration.type}-cert`
@@ -279,7 +276,7 @@ function apiErrorElaborator(metricContext, context){
     return async function(error){
         context.log(`api error for ${metricContext.testId}: ${JSON.stringify(error)}`)
         let elapsedMillis = Date.now() - metricContext['startTime'];
-        
+
         let apiMetrics = {}
         apiMetrics['message'] = error.message
         apiMetrics['duration'] = elapsedMillis;
@@ -311,7 +308,7 @@ function extractTlsVersion(versionString){
     }
 
 }
-    
+
 
 function buildRequest(monitoringConfiguration){
     let request = {
