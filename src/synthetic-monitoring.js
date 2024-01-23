@@ -19,6 +19,7 @@ axios.interceptors.response.use(function (response) {
     response[RESPONSE_TIME_KEY] = Date.now() - response.config.headers[START_TIMESTAMP_KEY]
     return response;
   }, function (error) {
+    console.error(error)
     //nothing to do
     return Promise.reject(error);
   });
@@ -29,6 +30,7 @@ axios.interceptors.request.use(
       return config;
     },
     (error) => {
+      console.error(error)
       return Promise.reject(error);
     }
   );
@@ -112,21 +114,20 @@ const monitoringConfiguration = [
 
 
 async function main() {
-    let context = console;//workaround to avoid a lot of refactor
     let tests = []
     for(idx in monitoringConfiguration){
-        tests.push(testIt(monitoringConfiguration[idx], context).catch((error) => {
-            context.log(`error in test for ${JSON.stringify(monitoringConfiguration[idx])}: ${JSON.stringify(error)}`)
+        tests.push(testIt(monitoringConfiguration[idx]).catch((error) => {
+            console.error(`error in test for ${JSON.stringify(monitoringConfiguration[idx])}: ${JSON.stringify(error)}`)
         }));
     }
 
     await Promise.all(tests)
-    context.log('Monitoring run completed');
+    console.log('Monitoring run completed');
 };
 
 
-async function testIt(monitoringConfiguration, context){
-    context.log(`preparing test for ${JSON.stringify(monitoringConfiguration)}`)
+async function testIt(monitoringConfiguration){
+    console.log(`preparing test for ${JSON.stringify(monitoringConfiguration)}`)
 
     let metricObjects =  initMetricObjects(monitoringConfiguration);
 
@@ -139,16 +140,16 @@ async function testIt(monitoringConfiguration, context){
         certMetrics: null
     }
 
-    return checkApi(metricContex, context)
-    .then(certChecker(context))
-    .then(telemetrySender(client, context))
-    .then(eventSender(client, context))
+    return checkApi(metricContex)
+    .then(certChecker())
+    .then(telemetrySender(client))
+    .then(eventSender(client))
 
 }
 
 
 
-function eventSender(client, context){
+function eventSender(client){
     return async function(metricContext){
         let enrichedMeasurements = enrichData(metricContext.baseEventData.measurements, metricContext.apiMetrics, keysForEvent)
         let enrichedProperties = enrichData(metricContext.baseEventData.properties, metricContext.apiMetrics, keysForEventProperties)
@@ -159,7 +160,7 @@ function eventSender(client, context){
         metricContext.baseEventData['measurements'] = enrichedMeasurements
         metricContext.baseEventData['properties'] = enrichedProperties
 
-        context.log(`event for ${metricContext.testId}: ${JSON.stringify(metricContext.baseEventData)}`)
+        console.log(`event for ${metricContext.testId}: ${JSON.stringify(metricContext.baseEventData)}`)
         client.trackEvent(metricContext.baseEventData);
 
         return metricContext;
@@ -179,18 +180,18 @@ function enrichData(baseData, checkResult, keyList){
 }
 
 
-function telemetrySender(client, context){
+function telemetrySender(client){
     return async function(metricContext){
         //merge monitoring results and send
         if (metricContext.apiMetrics){
             let apiTelemetryData = enrichData(metricContext.baseTelemetryData, metricContext.apiMetrics, keysForTelemetry);
-            context.log(`tracking api telemetry for ${metricContext.testId} : ${JSON.stringify(apiTelemetryData)}`)
+            console.log(`tracking api telemetry for ${metricContext.testId} : ${JSON.stringify(apiTelemetryData)}`)
             client.trackAvailability(apiTelemetryData);
         }
 
         if (metricContext.certMetrics){
             let certTelemetryData = enrichData(metricContext.baseTelemetryData, metricContext.certMetrics, keysForTelemetry);
-            context.log(`tracking cert telemetry for ${metricContext.testId}: ${JSON.stringify(certTelemetryData)}`)
+            console.log(`tracking cert telemetry for ${metricContext.testId}: ${JSON.stringify(certTelemetryData)}`)
             client.trackAvailability(certTelemetryData);
         }
 
@@ -200,9 +201,9 @@ function telemetrySender(client, context){
 
 
 
-function certChecker(context){
+function certChecker(){
     return async function checkCert(metricContext){
-        context.log(`checking certificate for ${metricContext.testId}? ${metricContext.monitoringConfiguration.checkCertificate}`)
+        console.log(`checking certificate for ${metricContext.testId}? ${metricContext.monitoringConfiguration.checkCertificate}`)
         let url = new URL(metricContext.monitoringConfiguration.url)
 
         metricContext.certMetrics = {
@@ -212,8 +213,8 @@ function certChecker(context){
 
         if (metricContext.monitoringConfiguration.checkCertificate){
             return sslCertificate.get(url.host)
-                .then(certResponseElaborator(metricContext, context))
-                .catch(certErrorElaborator(metricContext, context))
+                .then(certResponseElaborator(metricContext))
+                .catch(certErrorElaborator(metricContext))
         } else {
             return metricContext
         }
@@ -221,9 +222,9 @@ function certChecker(context){
 }
 
 
-function certResponseElaborator(metricContext, context){
+function certResponseElaborator(metricContext){
     return async function(certResponse){
-        context.log(`cert response for ${metricContext.testId}: valid to ${certResponse.valid_to}`)
+        console.log(`cert response for ${metricContext.testId}: valid to ${certResponse.valid_to}`)
         let validTo = new Date(certResponse.valid_to);
         const millisToExpiration = validTo - Date.now();
         metricContext.certMetrics['success'] = millisToExpiration > 604800000; //7 days in millis
@@ -236,9 +237,9 @@ function certResponseElaborator(metricContext, context){
     }
 }
 
-function certErrorElaborator(metricContext, context){
+function certErrorElaborator(metricContext){
     return async function(error){
-        context.log(`cert error for ${metricContext.testId}: ${JSON.stringify(error)}`)
+        console.log(`cert error for ${metricContext.testId}: ${JSON.stringify(error)}`)
         metricContext.certMetrics['message'] = error.message
         metricContext.certMetrics['runLocation'] = `${metricContext.monitoringConfiguration.type}-cert`
         metricContext.certMetrics['success'] = false
@@ -247,13 +248,13 @@ function certErrorElaborator(metricContext, context){
     }
 }
 
-function apiResponseElaborator(metricContext, context){
+function apiResponseElaborator(metricContext){
     return async function(response){
-        context.log(`api response for ${metricContext.testId}: ${response.status} ${response.data}`)
+        console.log(`api response for ${metricContext.testId}: ${response.status}`)
         let apiMetrics = {}
 
         let statusCodeOk = isStatusCodeAccepted(response.status, metricContext.monitoringConfiguration.expectedCodes)
-        context.log(`status code accepted for ${metricContext.testId}? ${statusCodeOk}`)
+        console.log(`status code accepted for ${metricContext.testId}? ${statusCodeOk}`)
 
         apiMetrics['duration'] = response[RESPONSE_TIME_KEY];
         apiMetrics['success'] = statusCodeOk;
@@ -261,11 +262,11 @@ function apiResponseElaborator(metricContext, context){
         apiMetrics['httpStatus'] = response.status
         apiMetrics['targetStatus'] = statusCodeOk ? 1 : 0
 
-        context.log(`partial api metrics for  ${metricContext.testId}? ${JSON.stringify(response[TLS_VERSION_KEY])}`)
+        console.log(`partial api metrics for  ${metricContext.testId}? ${JSON.stringify(response[TLS_VERSION_KEY])}`)
 
         apiMetrics['targetTlsVersion'] = extractTlsVersion(response[TLS_VERSION_KEY]);
 
-        context.log(`partial2 api metrics for  ${metricContext.testId}? ${JSON.stringify(apiMetrics)}`)
+        console.log(`partial2 api metrics for  ${metricContext.testId}? ${JSON.stringify(apiMetrics)}`)
 
         metricContext.apiMetrics = apiMetrics
 
@@ -273,9 +274,9 @@ function apiResponseElaborator(metricContext, context){
     }
 }
 
-function apiErrorElaborator(metricContext, context){
+function apiErrorElaborator(metricContext){
     return async function(error){
-        context.log(`api error for ${metricContext.testId}: ${JSON.stringify(error)}`)
+        console.log(`api error for ${metricContext.testId}: ${JSON.stringify(error)}`)
         let elapsedMillis = Date.now() - metricContext['startTime'];
 
         let apiMetrics = {}
@@ -288,12 +289,12 @@ function apiErrorElaborator(metricContext, context){
     }
 }
 
-async function checkApi(metricContext, context){
+async function checkApi(metricContext){
     metricContext['startTime'] = Date.now();
-    context.log(`check api for ${metricContext.testId}`)
+    console.log(`check api for ${metricContext.testId}`)
     return axios(buildRequest(metricContext.monitoringConfiguration))
-        .then(apiResponseElaborator(metricContext, context))
-        .catch(apiErrorElaborator(metricContext, context))
+        .then(apiResponseElaborator(metricContext))
+        .catch(apiErrorElaborator(metricContext))
 }
 
 
