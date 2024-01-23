@@ -261,12 +261,7 @@ function apiResponseElaborator(metricContext){
         apiMetrics['message'] = `${response.statusText}`
         apiMetrics['httpStatus'] = response.status
         apiMetrics['targetStatus'] = statusCodeOk ? 1 : 0
-
-        console.log(`partial api metrics for  ${metricContext.testId}? ${JSON.stringify(response[TLS_VERSION_KEY])}`)
-
         apiMetrics['targetTlsVersion'] = extractTlsVersion(response[TLS_VERSION_KEY]);
-
-        console.log(`partial2 api metrics for  ${metricContext.testId}? ${JSON.stringify(apiMetrics)}`)
 
         metricContext.apiMetrics = apiMetrics
 
