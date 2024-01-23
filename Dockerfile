@@ -1,11 +1,10 @@
-# To enable ssh & remote debugging on app service change the base image to the one below
-FROM mcr.microsoft.com/azure-functions/node:4-node18-appservice
-#FROM mcr.microsoft.com/azure-functions/node:4-node18
+FROM node:18.19.0-buster
 
-ENV AzureWebJobsScriptRoot=/home/site/wwwroot \
-    AzureFunctionsJobHost__Logging__Console__IsEnabled=true
-
-COPY . /home/site/wwwroot
-
-RUN cd /home/site/wwwroot && \
-    npm install
+RUN mkdir -p /home/node/app/node_modules && chown -R node:node /home/node/app
+WORKDIR /home/node/app
+COPY package.json ./
+USER node
+RUN npm install
+COPY --chown=node:node src/synthetic-monitoring.js .
+#ENV APP_INSIGHT_CONNECTION_STRING=InstrumentationKey=f3d23a26-e8eb-430e-8ea6-d158a570d6ce;IngestionEndpoint=https://northeurope-2.in.applicationinsights.azure.com/;LiveEndpoint=https://northeurope.livediagnostics.monitor.azure.com/
+CMD [ "node", "synthetic-monitoring.js" ]

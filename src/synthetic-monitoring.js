@@ -1,9 +1,9 @@
 let appInsights = require("applicationinsights");
 const axios = require('axios');
 const sslCertificate = require('get-ssl-certificate')
-appInsights.setup().start();
+appInsights.setup(process.env.APP_INSIGHT_CONNECTION_STRING).start();
 
-let client = new appInsights.TelemetryClient();
+let client = new appInsights.TelemetryClient(process.env.APP_INSIGHT_CONNECTION_STRING);
 
 const keysForTelemetry = ['success', 'message', 'duration', 'runLocation'];
 const keysForEvent = ['duration', 'targetStatus', 'targetExpirationTimestamp', 'httpStatus', 'targetTlsVersion', 'targetExpireInDays'] ;
@@ -111,7 +111,8 @@ const monitoringConfiguration = [
 ]
 
 
-module.exports = async function (context, myTimer) {
+async function main() {
+    let context = console;//workaround to avoid a lot of refactor
     let tests = []
     for(idx in monitoringConfiguration){
         tests.push(testIt(monitoringConfiguration[idx], context).catch((error) => {
@@ -386,3 +387,6 @@ function isStatusCodeAccepted(statusCode, acceptedCodes){
 
     return accepted;
 }
+
+
+main().then(result => console.log("END"));
