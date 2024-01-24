@@ -1,7 +1,15 @@
 let appInsights = require("applicationinsights");
 const axios = require('axios');
 const sslCertificate = require('get-ssl-certificate')
+const { TableServiceClient, AzureNamedKeyCredential } = require("@azure/data-tables");
 appInsights.setup(process.env.APP_INSIGHT_CONNECTION_STRING).start();
+
+const account = process.env.STORAGE_ACCOUNT_NAME;
+const accountKey = process.env.STORAGE_ACCOUNT_KEY;
+const tableName = process.env.STORAGE_ACCOUNT_TABLE_NAME
+
+const credential = new AzureNamedKeyCredential(account, accountKey);
+const tableClient = new TableClient(`https://${account}.table.core.windows.net`, tableName, credential);
 
 let client = new appInsights.TelemetryClient(process.env.APP_INSIGHT_CONNECTION_STRING);
 
@@ -114,6 +122,14 @@ const monitoringConfiguration = [
 
 
 async function main() {
+    let entitiesIter = client.listEntities();
+    let i = 1;
+    for await (const entity of entitiesIter) {
+      console.log(`Entity${i}: PartitionKey: ${entity.partitionKey} RowKey: ${entity.rowKey} Data: ${JSON.stringify(entity)}`);
+      i++;
+    }
+
+
     let tests = []
     for(idx in monitoringConfiguration){
         tests.push(testIt(monitoringConfiguration[idx]).catch((error) => {

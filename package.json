@@ -8,11 +8,11 @@
   "scripts": {
   },
   "dependencies": {
-    "@azure/functions": "^4.0.0",
+    "@azure/data-tables": "^13.2.2",
     "applicationinsights": "^2.9.1",
     "axios": "^1.6.2",
     "stopwatch-node": "^1.1.0",
-    "get-ssl-certificate": "2.3.3"
+    "get-ssl-certificate": "^2.3.3"
   },
   "devDependencies": {
   }
