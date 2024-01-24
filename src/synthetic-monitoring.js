@@ -127,7 +127,7 @@ const monitoringConfiguration = [
 
 
 async function main() {
-    let entitiesIter = client.listEntities();
+    let entitiesIter = tableClient.listEntities();
     let i = 1;
     for await (const entity of entitiesIter) {
       console.log(`Entity${i}: PartitionKey: ${entity.partitionKey} RowKey: ${entity.rowKey} Data: ${JSON.stringify(entity)}`);
