@@ -1,7 +1,7 @@
 let appInsights = require("applicationinsights");
 const axios = require('axios');
 const sslCertificate = require('get-ssl-certificate')
-const { TableServiceClient, AzureNamedKeyCredential } = require("@azure/data-tables");
+const { TableClient, AzureNamedKeyCredential } = require("@azure/data-tables");
 appInsights.setup(process.env.APP_INSIGHT_CONNECTION_STRING).start();
 
 const account = process.env.STORAGE_ACCOUNT_NAME;
