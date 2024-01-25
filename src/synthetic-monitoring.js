@@ -55,9 +55,10 @@ async function main() {
       console.log(`monitoringConfiguration: ${JSON.stringify(monitoringConfiguration)}`)
       monitoringConfiguration['appName'] = tableConfiguration.partitionKey
       monitoringConfiguration['apiName'] = tableConfiguration.rowKey
-      monitoringConfiguration['tags'] = monitoringConfiguration['tags'] != "null" ? JSON.parse(monitoringConfiguration['tags']) : {}
-      monitoringConfiguration['body'] = monitoringConfiguration['body'] != "null" ? JSON.parse(monitoringConfiguration['body']) : null
-      monitoringConfiguration['headers'] = monitoringConfiguration['headers'] != "null" ? JSON.parse(monitoringConfiguration['headers']) : null
+      monitoringConfiguration['tags'] = !isNull(monitoringConfiguration['tags']) ? JSON.parse(monitoringConfiguration['tags']) : {}
+      monitoringConfiguration['body'] = !isNull(monitoringConfiguration['body']) ? JSON.parse(monitoringConfiguration['body']) : null
+      monitoringConfiguration['headers'] = !isNull(monitoringConfiguration['headers'])? JSON.parse(monitoringConfiguration['headers']) : null
+      monitoringConfiguration['expectedCodes'] = !isNull(monitoringConfiguration['expectedCodes']) ? JSON.parse(monitoringConfiguration['expectedCodes']) : null
 
       tests.push(testIt(monitoringConfiguration).catch((error) => {
             console.error(`error in test for ${JSON.stringify(monitoringConfiguration)}: ${JSON.stringify(error)}`)
@@ -68,6 +69,9 @@ async function main() {
     console.log('Monitoring run completed');
 };
 
+function isNull(data){
+  return data == null || data == "null"
+}
 
 async function testIt(monitoringConfiguration){
     console.log(`preparing test for ${JSON.stringify(monitoringConfiguration)}`)
