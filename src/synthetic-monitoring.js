@@ -49,6 +49,7 @@ async function main() {
     let tests = []
     for (const tableConfiguration in monitoringConfigurations) {
 
+      console.log(`tableconfiguration: ${tableConfiguration}`)
       //property names remap
       let monitoringConfiguration = {...tableConfiguration}
       monitoringConfiguration['appName'] = tableConfiguration.partitionKey
