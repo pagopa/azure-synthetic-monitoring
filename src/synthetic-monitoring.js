@@ -8,11 +8,6 @@ const account = process.env.STORAGE_ACCOUNT_NAME;
 const accountKey = process.env.STORAGE_ACCOUNT_KEY;
 const tableName = process.env.STORAGE_ACCOUNT_TABLE_NAME
 
-console.log("--------")
-console.log(account)
-console.log(accountKey)
-console.log(tableName)
-console.log("--------")
 const credential = new AzureNamedKeyCredential(account, accountKey);
 const tableClient = new TableClient(`https://${account}.table.core.windows.net`, tableName, credential);
 
@@ -49,96 +44,21 @@ axios.interceptors.request.use(
   );
 
 
-const monitoringConfiguration = [
-    {
-        "apiName" : "aks_ingress",
-        "appName": "microservice",
-        "url": "https://dev01.blueprint.internal.devopslab.pagopa.it/blueprint/v5-java-helm-complete-test/",
-        "type": "private",
-        "checkCertificate": true,
-        "method": "GET",
-        "expectedCodes": ["200-299", "303"],
-        "tags": {
-            "description": "AKS ingress tested from internal network"
-        },
-    },
-    {
-        "apiName" : "pagoPA_public_api",
-        "appName": "pagoPA",
-        "url": "https://api.dev.platform.pagopa.it",
-        "type": "public",
-        "checkCertificate": true,
-        "method": "GET",
-        "expectedCodes": ["200"],
-        "tags": {
-            "description": "pagopa public api tested from internet network"
-        }
-
-    },
-    {
-        "apiName" : "post",
-        "appName": "httpbin",
-        "url": "https://httpbin.org/post",
-        "type": "public",
-        "method": "POST",
-        "checkCertificate": true,
-        "expectedCodes": ["200"],
-        "headers": {
-            "Content-Type": "application/json"
-        },
-        "body": {
-            "name": "value"
-        },
-        "tags": {
-            "description": "sample post request"
-        }
-    },
-    {
-        "apiName" : "get",
-        "appName": "httpbin",
-        "url": "https://httpbin.org/get",
-        "type": "private",
-        "checkCertificate": true,
-        "method": "GET",
-        "expectedCodes": ["200"],
-        "tags": {
-            "description": "sample post request"
-        }
-    },
-    {
-        "apiName" : "verifyPaymentNotice",
-        "appName": "pagoPA",
-        "url": "https://api.uat.platform.pagopa.it/nodo/node-for-psp/v1",
-        "type": "public",
-        "checkCertificate": false,
-        "method": "POST",
-        "expectedCodes": ["200"],
-        "headers" : {
-            "SOAPAction": "verifyPaymentNotice",
-            "Content-Type": "application/xml",
-            "Ocp-Apim-Subscription-Key": "b44466604e7f428e930826e6e05556fd"
-        },
-        "body": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:nod=\"http://pagopa-api.pagopa.gov.it/node/nodeForPsp.xsd\">    <soapenv:Header/>    <soapenv:Body>        <nod:verifyPaymentNoticeReq>            <idPSP>BCITITMM</idPSP>            <idBrokerPSP>00799960158</idBrokerPSP>            <idChannel>00799960158_12</idChannel>            <password>PLACEHOLDER</password>            <qrCode>                <fiscalCode>80005570561</fiscalCode>                <noticeNumber>301352423000009092</noticeNumber>            </qrCode>        </nod:verifyPaymentNoticeReq>    </soapenv:Body>  </soapenv:Envelope>",
-        "tags": {
-            "description": "sample post request"
-        }
-    }
-]
-
-
 async function main() {
-    let entitiesIter = tableClient.listEntities();
-    let i = 1;
-    for await (const entity of entitiesIter) {
-      console.log(`Entity${i}: PartitionKey: ${entity.partitionKey} RowKey: ${entity.rowKey} Data: ${JSON.stringify(entity)}`);
-      i++;
-    }
+    let monitoringConfigurations = await tableClient.listEntities();
+     let tests = []
+    for (const tableConfiguration of entitiesIter) {
 
+      //property names remap
+      let monitoringConfiguration = {...tableConfiguration}
+      monitoringConfiguration['appName'] = tableConfiguration.partitionKey
+      monitoringConfiguration['apiName'] = tableConfiguration.rowKey
+      monitoringConfiguration['tags'] = monitoringConfiguration['tags'] != "null" ? JSON.parse(monitoringConfiguration['tags']) : {}
+      monitoringConfiguration['body'] = monitoringConfiguration['body'] != "null" ? JSON.parse(monitoringConfiguration['body']) : null
+      monitoringConfiguration['headers'] = monitoringConfiguration['headers'] != "null" ? JSON.parse(monitoringConfiguration['headers']) : null
 
-    let tests = []
-    for(idx in monitoringConfiguration){
-        tests.push(testIt(monitoringConfiguration[idx]).catch((error) => {
-            console.error(`error in test for ${JSON.stringify(monitoringConfiguration[idx])}: ${JSON.stringify(error)}`)
+      tests.push(testIt(monitoringConfiguration).catch((error) => {
+            console.error(`error in test for ${JSON.stringify(monitoringConfiguration)}: ${JSON.stringify(error)}`)
         }));
     }
 
