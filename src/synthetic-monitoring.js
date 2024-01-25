@@ -46,8 +46,8 @@ axios.interceptors.request.use(
 
 async function main() {
     let monitoringConfigurations = await tableClient.listEntities();
-     let tests = []
-    for (const tableConfiguration of monitoringConfigurations) {
+    let tests = []
+    for (const tableConfiguration in monitoringConfigurations) {
 
       //property names remap
       let monitoringConfiguration = {...tableConfiguration}
