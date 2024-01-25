@@ -47,10 +47,9 @@ axios.interceptors.request.use(
 async function main() {
     let monitoringConfigurations = tableClient.listEntities();
     let tests = []
-//    for (const tableConfiguration in monitoringConfigurations) {
     for await (const tableConfiguration of monitoringConfigurations) {
-      console.log(`tableconfiguration: ${JSON.stringify(tableConfiguration)}`)
-      //property names remap
+
+      //property names remap and parsing
       let monitoringConfiguration = {...tableConfiguration}
       console.log(`monitoringConfiguration: ${JSON.stringify(monitoringConfiguration)}`)
       monitoringConfiguration['appName'] = tableConfiguration.partitionKey
