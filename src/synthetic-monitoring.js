@@ -262,7 +262,7 @@ function buildRequest(monitoringConfiguration){
             url: monitoringConfiguration.url,
             validateStatus: function (status) {
                 return true; //every status code should be treated as a valid code (it will be checked later)
-            }
+            },
             timeout: 30
     }
 
