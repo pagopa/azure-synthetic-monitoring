@@ -207,7 +207,7 @@ function apiResponseElaborator(metricContext){
         let durationOk = duration <= metricContext.monitoringConfiguration.durationLimit
         apiMetrics['duration'] = duration;
         apiMetrics['success'] = statusCodeOk && durationOk;
-        apiMetrics['message'] = !statusCodeOk ? `${response.statusText}` : (!durationOk ? `time limit exceeded: ${duration} > ${metricContext.monitoringConfiguration.durationLimit}` : `${response.statusText}`)
+        apiMetrics['message'] = !statusCodeOk ? `status code not valid: ${response.statusText}` : (!durationOk ? `time limit exceeded: ${duration} > ${metricContext.monitoringConfiguration.durationLimit}` : `${response.statusText}`)
         apiMetrics['httpStatus'] = response.status
         apiMetrics['targetStatus'] = statusCodeOk ? 1 : 0
         apiMetrics['targetTlsVersion'] = extractTlsVersion(response[TLS_VERSION_KEY]);
@@ -263,6 +263,7 @@ function buildRequest(monitoringConfiguration){
             validateStatus: function (status) {
                 return true; //every status code should be treated as a valid code (it will be checked later)
             }
+            timeout: 30
     }
 
     if (monitoringConfiguration.headers) {
