@@ -8,6 +8,7 @@ const account = process.env.STORAGE_ACCOUNT_NAME;
 const accountKey = process.env.STORAGE_ACCOUNT_KEY;
 const tableName = process.env.STORAGE_ACCOUNT_TABLE_NAME
 const availabilityPrefix = process.env.AVAILABILITY_PREFIX
+const httpClientTimeout = process.env.HTTP_CLIENT_TIMEOUT || 0
 
 const credential = new AzureNamedKeyCredential(account, accountKey);
 const tableClient = new TableClient(`https://${account}.table.core.windows.net`, tableName, credential);
@@ -59,7 +60,7 @@ async function main() {
       monitoringConfiguration['body'] = !isNull(monitoringConfiguration['body']) ? JSON.parse(monitoringConfiguration['body']) : null
       monitoringConfiguration['headers'] = !isNull(monitoringConfiguration['headers'])? JSON.parse(monitoringConfiguration['headers']) : null
       monitoringConfiguration['expectedCodes'] = !isNull(monitoringConfiguration['expectedCodes']) ? JSON.parse(monitoringConfiguration['expectedCodes']) : null
-      monitoringConfiguration['durationLimit'] = tableConfiguration.durationLimit || 10000
+      monitoringConfiguration['durationLimit'] = tableConfiguration.durationLimit
 
       tests.push(testIt(monitoringConfiguration).catch((error) => {
             console.error(`error in test for ${JSON.stringify(monitoringConfiguration)}: ${JSON.stringify(error)}`)
