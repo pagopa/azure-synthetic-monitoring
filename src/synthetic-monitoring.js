@@ -46,9 +46,9 @@ axios.interceptors.request.use(
 
 
 async function main() {
-    let monitoringConfigurations = tableClient.listEntities();
+    let tableEntities = tableClient.listEntities();
     let tests = []
-    for await (const tableConfiguration of monitoringConfigurations) {
+    for await (const tableConfiguration of tableEntities) {
 
       //property names remap and parsing
       let monitoringConfiguration = {...tableConfiguration}
@@ -59,6 +59,7 @@ async function main() {
       monitoringConfiguration['body'] = !isNull(monitoringConfiguration['body']) ? JSON.parse(monitoringConfiguration['body']) : null
       monitoringConfiguration['headers'] = !isNull(monitoringConfiguration['headers'])? JSON.parse(monitoringConfiguration['headers']) : null
       monitoringConfiguration['expectedCodes'] = !isNull(monitoringConfiguration['expectedCodes']) ? JSON.parse(monitoringConfiguration['expectedCodes']) : null
+      monitoringConfiguration['durationLimit'] = tableConfiguration.durationLimit || 10000
 
       tests.push(testIt(monitoringConfiguration).catch((error) => {
             console.error(`error in test for ${JSON.stringify(monitoringConfiguration)}: ${JSON.stringify(error)}`)
@@ -202,10 +203,11 @@ function apiResponseElaborator(metricContext){
 
         let statusCodeOk = isStatusCodeAccepted(response.status, metricContext.monitoringConfiguration.expectedCodes)
         console.log(`status code accepted for ${metricContext.testId}? ${statusCodeOk}`)
-
-        apiMetrics['duration'] = response[RESPONSE_TIME_KEY];
-        apiMetrics['success'] = statusCodeOk;
-        apiMetrics['message'] = `${response.statusText}`
+        let duration = response[RESPONSE_TIME_KEY];
+        let durationOk = duration <= metricContext.monitoringConfiguration.durationLimit
+        apiMetrics['duration'] = duration;
+        apiMetrics['success'] = statusCodeOk && durationOk;
+        apiMetrics['message'] = !statusCodeOk ? `${response.statusText}` : (!durationOk ? `time limit exceeded: ${duration} > ${metricContext.monitoringConfiguration.durationLimit}` : `${response.statusText}`)
         apiMetrics['httpStatus'] = response.status
         apiMetrics['targetStatus'] = statusCodeOk ? 1 : 0
         apiMetrics['targetTlsVersion'] = extractTlsVersion(response[TLS_VERSION_KEY]);
