@@ -28,7 +28,7 @@ axios.interceptors.response.use(function (response) {
     response[RESPONSE_TIME_KEY] = Date.now() - response.config.headers[START_TIMESTAMP_KEY]
     return response;
   }, function (error) {
-    console.error(error)
+    console.error(`resp error interceptor: ${JSON.stringify(error)}`)
     //nothing to do
     return Promise.reject(error);
   });
@@ -39,7 +39,7 @@ axios.interceptors.request.use(
       return config;
     },
     (error) => {
-      console.error(error)
+      console.error(`req error interceptor: ${JSON.stringify(error)}`)
       return Promise.reject(error);
     }
   );
