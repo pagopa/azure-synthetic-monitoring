@@ -7,6 +7,7 @@ appInsights.setup(process.env.APP_INSIGHT_CONNECTION_STRING).start();
 const account = process.env.STORAGE_ACCOUNT_NAME;
 const accountKey = process.env.STORAGE_ACCOUNT_KEY;
 const tableName = process.env.STORAGE_ACCOUNT_TABLE_NAME
+const availabilityPrefix = process.env.AVAILABILITY_PREFIX
 
 const credential = new AzureNamedKeyCredential(account, accountKey);
 const tableClient = new TableClient(`https://${account}.table.core.windows.net`, tableName, credential);
@@ -290,16 +291,16 @@ function initMetricObjects(monitoringConfiguration){
     }
 
     let telemetryData =  {
-        id: `synthetic_${testId}`,
+        id: `${availabilityPrefix}-${testId}`,
         message: "",
         success : false,
-        name: `synthetic_${testId}`,
+        name: `${availabilityPrefix}-${testId}`,
         runLocation: monitoringConfiguration.type,
         properties: properties
     };
 
     let eventData = {
-        name: `synthetic_${testId}_${monitoringConfiguration.type}`,
+        name: `${availabilityPrefix}-${testId}-${monitoringConfiguration.type}`,
         measurements: measurements,
         properties: properties
 
