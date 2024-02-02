@@ -236,11 +236,11 @@ function apiResponseElaborator(metricContext){
         let durationOk = duration <= metricContext.monitoringConfiguration.durationLimit
         let apiMetrics = {
           duration,
-          success = statusCodeOk && durationOk,
-          message = !statusCodeOk ? `status code not valid: ${response.statusText}` : (!durationOk ? `time limit exceeded: ${duration} > ${metricContext.monitoringConfiguration.durationLimit}` : `${response.statusText}`),
-          httpStatus = response.status,
-          targetStatus = statusCodeOk ? 1 : 0,
-          targetTlsVersion = extractTlsVersion(response[TLS_VERSION_KEY])
+          success : statusCodeOk && durationOk,
+          message : !statusCodeOk ? `status code not valid: ${response.statusText}` : (!durationOk ? `time limit exceeded: ${duration} > ${metricContext.monitoringConfiguration.durationLimit}` : `${response.statusText}`),
+          httpStatus : response.status,
+          targetStatus : statusCodeOk ? 1 : 0,
+          targetTlsVersion : extractTlsVersion(response[TLS_VERSION_KEY])
         }
         metricContext.apiMetrics = apiMetrics
 
