@@ -230,8 +230,6 @@ function certErrorElaborator(metricContext){
 function apiResponseElaborator(metricContext){
     return async function(response){
         console.log(`api response for ${metricContext.testId}: ${response.status}`)
-        let apiMetrics = {}
-
         let statusCodeOk = isStatusCodeAccepted(response.status, metricContext.monitoringConfiguration.expectedCodes)
         console.log(`status code accepted for ${metricContext.testId}? ${statusCodeOk}`)
         let duration = response[RESPONSE_TIME_KEY];
@@ -315,10 +313,11 @@ function buildRequest(monitoringConfiguration){
 function initMetricObjects(monitoringConfiguration){
     let testId = `${monitoringConfiguration.appName}-${monitoringConfiguration.apiName}`
 
-    let properties = {}
-    properties['appName'] = monitoringConfiguration.appName
-    properties['apiName'] = monitoringConfiguration.apiName
-    properties['endpoint'] = `${monitoringConfiguration.method} ${monitoringConfiguration.url}`
+    let properties = {
+      appName:  monitoringConfiguration.appName,
+      apiName:  monitoringConfiguration.apiName,
+      endpoint:  `${monitoringConfiguration.method} ${monitoringConfiguration.url}`
+    }
 
     let measurements = {}
 
@@ -337,7 +336,7 @@ function initMetricObjects(monitoringConfiguration){
 
     let eventData = {
         name: `${availabilityPrefix}-${testId}-${monitoringConfiguration.type}`,
-        measurements: measurements,
+        measurements,
         properties
      }
 
