@@ -236,13 +236,14 @@ function apiResponseElaborator(metricContext){
         console.log(`status code accepted for ${metricContext.testId}? ${statusCodeOk}`)
         let duration = response[RESPONSE_TIME_KEY];
         let durationOk = duration <= metricContext.monitoringConfiguration.durationLimit
-        apiMetrics['duration'] = duration;
-        apiMetrics['success'] = statusCodeOk && durationOk;
-        apiMetrics['message'] = !statusCodeOk ? `status code not valid: ${response.statusText}` : (!durationOk ? `time limit exceeded: ${duration} > ${metricContext.monitoringConfiguration.durationLimit}` : `${response.statusText}`)
-        apiMetrics['httpStatus'] = response.status
-        apiMetrics['targetStatus'] = statusCodeOk ? 1 : 0
-        apiMetrics['targetTlsVersion'] = extractTlsVersion(response[TLS_VERSION_KEY]);
-
+        let apiMetrics = {
+          duration,
+          success = statusCodeOk && durationOk,
+          message = !statusCodeOk ? `status code not valid: ${response.statusText}` : (!durationOk ? `time limit exceeded: ${duration} > ${metricContext.monitoringConfiguration.durationLimit}` : `${response.statusText}`),
+          httpStatus = response.status,
+          targetStatus = statusCodeOk ? 1 : 0,
+          targetTlsVersion = extractTlsVersion(response[TLS_VERSION_KEY])
+        }
         metricContext.apiMetrics = apiMetrics
 
         return metricContext
@@ -254,11 +255,12 @@ function apiErrorElaborator(metricContext){
         console.log(`api error for ${metricContext.testId}: ${JSON.stringify(error)}`)
         let elapsedMillis = Date.now() - metricContext['startTime'];
 
-        let apiMetrics = {}
-        apiMetrics['message'] = error.message
-        apiMetrics['duration'] = elapsedMillis;
-        apiMetrics['success'] = false;
-        apiMetrics['targetStatus'] = 0
+        let apiMetrics = {
+          message:  error.message,
+          duration:  elapsedMillis,
+          success:  false,
+          targetStatus:  0
+        }
         metricContext.apiMetrics = apiMetrics
         return metricContext
     }
@@ -330,14 +332,13 @@ function initMetricObjects(monitoringConfiguration){
         success : false,
         name: `${availabilityPrefix}-${testId}`,
         runLocation: monitoringConfiguration.type,
-        properties: properties
+        properties
     };
 
     let eventData = {
         name: `${availabilityPrefix}-${testId}-${monitoringConfiguration.type}`,
         measurements: measurements,
-        properties: properties
-
+        properties
      }
 
     return {
