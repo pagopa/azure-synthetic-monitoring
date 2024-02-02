@@ -51,24 +51,33 @@ async function main() {
     let tests = []
     for await (const tableConfiguration of tableEntities) {
 
-      //property names remap and parsing
-      let monitoringConfiguration = {...tableConfiguration}
-      console.log(`monitoringConfiguration: ${JSON.stringify(monitoringConfiguration)}`)
-      monitoringConfiguration['appName'] = tableConfiguration.partitionKey
-      monitoringConfiguration['apiName'] = tableConfiguration.rowKey
-      monitoringConfiguration['tags'] = !isNull(monitoringConfiguration['tags']) ? JSON.parse(monitoringConfiguration['tags']) : {}
-      monitoringConfiguration['body'] = !isNull(monitoringConfiguration['body']) ? JSON.parse(monitoringConfiguration['body']) : null
-      monitoringConfiguration['headers'] = !isNull(monitoringConfiguration['headers'])? JSON.parse(monitoringConfiguration['headers']) : null
-      monitoringConfiguration['expectedCodes'] = !isNull(monitoringConfiguration['expectedCodes']) ? JSON.parse(monitoringConfiguration['expectedCodes']) : null
-      monitoringConfiguration['durationLimit'] = tableConfiguration.durationLimit
+        try{
+            //property names remap and parsing
+            let monitoringConfiguration = {
+                ...tableConfiguration,
+                appName: tableConfiguration.partitionKey,
+                apiName: tableConfiguration.rowKey,
+                tags: !isNull(monitoringConfiguration['tags']) ? JSON.parse(monitoringConfiguration['tags']) : {},
+                body: !isNull(monitoringConfiguration['body']) ? JSON.parse(monitoringConfiguration['body']) : null,
+                headers: !isNull(monitoringConfiguration['headers'])? JSON.parse(monitoringConfiguration['headers']) : null,
+                expectedCodes: !isNull(monitoringConfiguration['expectedCodes']) ? JSON.parse(monitoringConfiguration['expectedCodes']) : null,
+                durationLimit: tableConfiguration.durationLimit
+            }
+            console.log(`monitoringConfiguration: ${JSON.stringify(monitoringConfiguration)}`)
+            
+            tests.push(testIt(monitoringConfiguration).catch((error) => {
+                console.error(`error in test for ${JSON.stringify(monitoringConfiguration)}: ${JSON.stringify(error)}`)
+            }));
 
-      tests.push(testIt(monitoringConfiguration).catch((error) => {
-            console.error(`error in test for ${JSON.stringify(monitoringConfiguration)}: ${JSON.stringify(error)}`)
-        }));
+        }catch (parseError){
+            console.error(`error parsing test test for ${JSON.stringify(monitoringConfiguration)}: ${JSON.stringify(parseError)}`)
+            tests.push(new Promise((resolve, reject) => {
+                reject(parseError)
+              }));
+        }
     }
 
     await Promise.all(tests)
-    console.log('Monitoring run completed');
 };
 
 function isNull(data){
@@ -336,4 +345,4 @@ function isStatusCodeAccepted(statusCode, acceptedCodes){
 }
 
 
-main().then(result => console.log("END"));
+main().then(result => console.log("END")).catch();
