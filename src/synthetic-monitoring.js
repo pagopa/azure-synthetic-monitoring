@@ -29,7 +29,6 @@ const successMonitoringEvent = {
   success : true,
   name: `${availabilityPrefix}-monitoring-function`,
   runLocation: "-",
-  properties: properties
 }
 
 const failedMonitoringEvent = {
@@ -38,7 +37,6 @@ const failedMonitoringEvent = {
   success : false,
   name: `${availabilityPrefix}-monitoring-function`,
   runLocation: "-",
-  properties: properties
 }
 
 //prepare axios interceptors
