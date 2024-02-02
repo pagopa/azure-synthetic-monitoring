@@ -66,4 +66,5 @@ When checking the certificate, the suffix `-cert` will be appended to the "runLo
 | STORAGE_ACCOUNT_TABLE_NAME    | table name used to store the monitoring configuration                                          | yes      | -         |
 | AVAILABILITY_PREFIX           | prefix used in the custom metric and events names                                              | no       | synthetic |
 | HTTP_CLIENT_TIMEOUT           | timeout used by the http client performing the availability requests                           | yes      | -         |
+| LOCATION                      | region name where this job is run                                                              | yes      | -         |
 

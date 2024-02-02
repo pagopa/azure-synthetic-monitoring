@@ -376,4 +376,4 @@ function isStatusCodeAccepted(statusCode, acceptedCodes){
 }
 
 
-main().then(result => console.log("END"));
+main()
