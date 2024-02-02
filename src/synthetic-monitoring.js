@@ -97,8 +97,8 @@ async function main() {
     }
 
     await Promise.all(tests)
-                 .then((result) => {client.trackEvent(successMonitoringEvent);})
-                 .catch((error) => {client.trackEvent(failedMonitoringEvent);})
+                 .then((result) => {console.log("SUCCESS"); client.trackEvent(successMonitoringEvent);})
+                 .catch((error) => {console.log("FAILURE"); client.trackEvent(failedMonitoringEvent);})
 };
 
 function isNull(data){
