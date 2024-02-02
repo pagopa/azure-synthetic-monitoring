@@ -18,10 +18,28 @@ let client = new appInsights.TelemetryClient(process.env.APP_INSIGHT_CONNECTION_
 
 const keysForTelemetry = ['success', 'message', 'duration', 'runLocation'];
 const keysForEvent = ['duration', 'targetStatus', 'targetExpirationTimestamp', 'httpStatus', 'targetTlsVersion', 'targetExpireInDays'] ;
-const keysForEventProperties = ['domain', 'checkCert'] ;
+const keysForEventProperties = ['domain', 'checkCert'];
 const TLS_VERSION_KEY = "TLS_VERSION"
 const START_TIMESTAMP_KEY = "x-request-timestamp"
 const RESPONSE_TIME_KEY = "RESPONSE_TIME"
+
+const successMonitoringEvent = {
+  id: `${availabilityPrefix}-monitoring-function`,
+  message: "",
+  success : true,
+  name: `${availabilityPrefix}-monitoring-function`,
+  runLocation: "-",
+  properties: properties
+}
+
+const failedMonitoringEvent = {
+  id: `${availabilityPrefix}-monitoring-function`,
+  message: "",
+  success : false,
+  name: `${availabilityPrefix}-monitoring-function`,
+  runLocation: "-",
+  properties: properties
+}
 
 //prepare axios interceptors
 axios.interceptors.response.use(function (response) {
@@ -72,13 +90,15 @@ async function main() {
 
         }catch (parseError){
             console.error(`error parsing test for ${JSON.stringify(tableConfiguration)}`)
-//            tests.push(new Promise((resolve, reject) => {
-//                reject(parseError)
-//              }));
+            tests.push(new Promise((resolve, reject) => {
+                reject(parseError.message)
+              }));
         }
     }
 
     await Promise.all(tests)
+                 .then((result) => {client.trackEvent(successMonitoringEvent);})
+                 .catch((error) => {client.trackEvent(failedMonitoringEvent);})
 };
 
 function isNull(data){
