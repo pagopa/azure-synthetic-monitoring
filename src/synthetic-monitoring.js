@@ -9,6 +9,7 @@ const accountKey = process.env.STORAGE_ACCOUNT_KEY;
 const tableName = process.env.STORAGE_ACCOUNT_TABLE_NAME
 const availabilityPrefix = process.env.AVAILABILITY_PREFIX
 const httpClientTimeout = process.env.HTTP_CLIENT_TIMEOUT
+const statusCodeRangeSeparator = "-"
 
 const credential = new AzureNamedKeyCredential(account, accountKey);
 const tableClient = new TableClient(`https://${account}.table.core.windows.net`, tableName, credential);
@@ -70,7 +71,7 @@ async function main() {
             }));
 
         }catch (parseError){
-            console.error(`error parsing test for ${JSON.stringify(tableConfiguration)}: ${JSON.stringify(parseError)}`)
+            console.error(`error parsing test for ${JSON.stringify(tableConfiguration)}`)
             tests.push(new Promise((resolve, reject) => {
                 reject(parseError)
               }));
@@ -328,10 +329,11 @@ function initMetricObjects(monitoringConfiguration){
 function isStatusCodeAccepted(statusCode, acceptedCodes){
     let accepted = false;
     acceptedCodes.forEach((codeRange) =>  {
-        // is an actual range eg: 200-250
-        if(codeRange.indexOf('-') > 0){
-            let boundaries = codeRange.split('-');
-            if (statusCode >= boundaries[0] && statusCode <= boundaries[1]){
+        if(codeRange.indexOf(statusCodeRangeSeparator) > 0){// is an actual range eg: 200-250
+            let boundaries = codeRange.split(statusCodeRangeSeparator);
+            let minStatusCode = boundaries[0]
+            let maxStatusCode = boundaries[1]
+            if (statusCode >= minStatusCode && statusCode <= maxStatusCode){
                 accepted = true
             }
         }else{//is a specific code eg: 303
