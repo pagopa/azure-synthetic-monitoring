@@ -97,8 +97,8 @@ async function main() {
     }
 
     Promise.all(tests)
-                 .then((result) => {console.log("SUCCESS"); trackSelfAvailabilityEvent(successMonitoringEvent);})
-                 .catch((error) => {console.error("FAILURE"); trackSelfAvailabilityEvent(failedMonitoringEvent);})
+                 .then((result) => {console.log("SUCCESS"); trackSelfAvailabilityEvent(successMonitoringEvent, startTime);})
+                 .catch((error) => {console.error("FAILURE"); trackSelfAvailabilityEvent(failedMonitoringEvent, startTime);})
 };
 
 function trackSelfAvailabilityEvent(toTrack, startTime){
