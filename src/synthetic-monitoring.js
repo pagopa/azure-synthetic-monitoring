@@ -57,14 +57,14 @@ async function main() {
                 ...tableConfiguration,
                 appName: tableConfiguration.partitionKey,
                 apiName: tableConfiguration.rowKey,
-                tags: !isNull(monitoringConfiguration['tags']) ? JSON.parse(monitoringConfiguration['tags']) : {},
-                body: !isNull(monitoringConfiguration['body']) ? JSON.parse(monitoringConfiguration['body']) : null,
-                headers: !isNull(monitoringConfiguration['headers'])? JSON.parse(monitoringConfiguration['headers']) : null,
-                expectedCodes: !isNull(monitoringConfiguration['expectedCodes']) ? JSON.parse(monitoringConfiguration['expectedCodes']) : null,
+                tags: !isNull(tableConfiguration['tags']) ? JSON.parse(tableConfiguration['tags']) : {},
+                body: !isNull(tableConfiguration['body']) ? JSON.parse(tableConfiguration['body']) : null,
+                headers: !isNull(tableConfiguration['headers'])? JSON.parse(tableConfiguration['headers']) : null,
+                expectedCodes: !isNull(tableConfiguration['expectedCodes']) ? JSON.parse(tableConfiguration['expectedCodes']) : null,
                 durationLimit: tableConfiguration.durationLimit
             }
             console.log(`monitoringConfiguration: ${JSON.stringify(monitoringConfiguration)}`)
-            
+
             tests.push(testIt(monitoringConfiguration).catch((error) => {
                 console.error(`error in test for ${JSON.stringify(monitoringConfiguration)}: ${JSON.stringify(error)}`)
             }));
