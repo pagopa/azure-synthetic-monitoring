@@ -70,7 +70,7 @@ async function main() {
             }));
 
         }catch (parseError){
-            console.error(`error parsing test test for ${JSON.stringify(monitoringConfiguration)}: ${JSON.stringify(parseError)}`)
+            console.error(`error parsing test test for ${JSON.stringify(tableConfiguration)}: ${JSON.stringify(parseError)}`)
             tests.push(new Promise((resolve, reject) => {
                 reject(parseError)
               }));
