@@ -9,6 +9,7 @@ const accountKey = process.env.STORAGE_ACCOUNT_KEY;
 const tableName = process.env.STORAGE_ACCOUNT_TABLE_NAME
 const availabilityPrefix = process.env.AVAILABILITY_PREFIX
 const httpClientTimeout = process.env.HTTP_CLIENT_TIMEOUT
+const location = process.env.LOCATION
 const statusCodeRangeSeparator = "-"
 
 const credential = new AzureNamedKeyCredential(account, accountKey);
@@ -28,8 +29,7 @@ const successMonitoringEvent = {
   message: "",
   success : true,
   name: `${availabilityPrefix}-monitoring-function`,
-  runLocation: "-",
-  duration: 0
+  runLocation: location,
 }
 
 const failedMonitoringEvent = {
@@ -37,8 +37,7 @@ const failedMonitoringEvent = {
   message: "At least one test failed to execute",
   success : false,
   name: `${availabilityPrefix}-monitoring-function`,
-  runLocation: "-",
-  duration: 0
+  runLocation: location,
 }
 
 //prepare axios interceptors
@@ -68,6 +67,7 @@ axios.interceptors.request.use(
 async function main() {
     let tableEntities = tableClient.listEntities();
     let tests = []
+    const startTime = Date.now();
     for await (const tableConfiguration of tableEntities) {
 
         try{
@@ -97,9 +97,18 @@ async function main() {
     }
 
     Promise.all(tests)
-                 .then((result) => {console.log("SUCCESS"); client.trackAvailability(successMonitoringEvent);})
-                 .catch((error) => {console.log("FAILURE"); client.trackAvailability(failedMonitoringEvent);})
+                 .then((result) => {console.log("SUCCESS"); trackSelfAvailabilityEvent(successMonitoringEvent);})
+                 .catch((error) => {console.error("FAILURE"); trackSelfAvailabilityEvent(failedMonitoringEvent);})
 };
+
+function trackSelfAvailabilityEvent(toTrack, startTime){
+    let event = {
+        ...toTrack,
+        duration : Date.now() - startTime
+    }
+    client.trackAvailability(event)
+
+}
 
 function isNull(data){
   return data == null || data == "null"
