@@ -34,7 +34,7 @@ const successMonitoringEvent = {
 
 const failedMonitoringEvent = {
   id: `${availabilityPrefix}-monitoring-function`,
-  message: "",
+  message: "At least one test failed to execute",
   success : false,
   name: `${availabilityPrefix}-monitoring-function`,
   runLocation: "-",
@@ -96,9 +96,9 @@ async function main() {
         }
     }
 
-    await Promise.all(tests)
-                 .then((result) => {console.log("SUCCESS"); client.trackEvent(successMonitoringEvent);})
-                 .catch((error) => {console.log("FAILURE"); client.trackEvent(failedMonitoringEvent);})
+    Promise.all(tests)
+                 .then((result) => {console.log("SUCCESS"); client.trackAvailability(successMonitoringEvent);})
+                 .catch((error) => {console.log("FAILURE"); client.trackAvailability(failedMonitoringEvent);})
 };
 
 function isNull(data){
