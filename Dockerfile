@@ -5,5 +5,5 @@ WORKDIR /home/node/app
 COPY package.json ./
 USER node
 RUN npm install
-COPY --chown=node:node src/synthetic-monitoring.js .
+COPY --chown=node:node src/*.js .
 CMD [ "node", "synthetic-monitoring.js" ]

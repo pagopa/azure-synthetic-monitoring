@@ -40,6 +40,7 @@ __azurite_*
 .vscode
 
 __*.sh
+local.env
 
 #sops decrypted files
 *_decrypted.json

@@ -6,6 +6,7 @@
   "author": "",
   "license": "MIT",
   "scripts": {
+    "test": "jest"
   },
   "dependencies": {
     "@azure/data-tables": "^13.2.2",
@@ -14,5 +15,6 @@
     "get-ssl-certificate": "^2.3.3"
   },
   "devDependencies": {
+    "jest": "^29.7.0"
   }
 }
