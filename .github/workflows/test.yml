@@ -1,12 +1,12 @@
 name: Tests
 
 on:
-  # Trigger the workflow on push on the main branch
-  push:
-    paths-ignore:
-      - 'CODEOWNERS'
-      - '**.md'
-      - '.**'
+  pull_request_target:
+    types:
+      - opened
+      - edited
+      - synchronize
+
 
 jobs:
   release:
