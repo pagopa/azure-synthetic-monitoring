@@ -1,0 +1,31 @@
+name: Tests
+
+on:
+  # Trigger the workflow on push on the main branch
+  push:
+    paths-ignore:
+      - 'CODEOWNERS'
+      - '**.md'
+      - '.**'
+
+jobs:
+  release:
+    name: Tests
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        id: checkout
+        # from https://github.com/actions/checkout/commits/main
+        uses: actions/checkout@1f9a0c22da41e6ebfa534300ef656657ea2c6707
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18.x'
+      - name: Install node dependencies
+        run: npm install
+      - name: Run tests
+        run: npm test
