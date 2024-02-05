@@ -5,7 +5,6 @@
 *.tfstate
 *.tfstate.*
 
-.vscode
 
 # Crash log files
 crash.log
@@ -38,8 +37,10 @@ __TMP
 .metals/
 __azurite_*
 /.idea
+.vscode
 
 __*.sh
+local.env
 
 #sops decrypted files
 *_decrypted.json
@@ -49,3 +50,6 @@ __*.sh
 **/libs
 __import_apim
 /pagopa-infra.iml
+
+
+/node_modules
