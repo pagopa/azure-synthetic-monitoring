@@ -106,3 +106,5 @@ async function checkApi(metricContext, httpClient){
         .then(statics.apiResponseElaborator(metricContext))
         .catch(statics.apiErrorElaborator(metricContext))
 }
+
+
