@@ -88,7 +88,7 @@ async function main() {
             }
             console.log(`monitoringConfiguration: ${JSON.stringify(monitoringConfiguration)}`)
 
-            tests.push(utils.testIt(monitoringConfiguration, client, sslClient, axios).catch((error) => {
+            tests.push(testIt(monitoringConfiguration, client, sslClient, axios).catch((error) => {
                 console.error(`error in test for ${JSON.stringify(monitoringConfiguration)}: ${JSON.stringify(error.message)}`)
             }));
 
@@ -105,6 +105,36 @@ async function main() {
                  .catch((error) => {console.error(`FAILURE: ${error}`); utils.trackSelfAvailabilityEvent(failedMonitoringEvent, startTime, client, error);})
 };
 
+
+/**
+ * executes the test configured by a monitoring configuration, sends the generated telemetry and events
+ * returns a promise fullfilled when the thest is ran (any outcome), rejected when the execution fails
+ * @param {monitoringConfiguration} monitoringConfiguration 
+ * @param {TelemetryClient} telemetryClient 
+ * @param {*} sslClient 
+ * @param {axios} httpClient axios client
+ * @returns promise rejected in case of a test EXECUTION failure
+ */
+async function testIt(monitoringConfiguration, telemetryClient, sslClient, httpClient){
+  console.log(`preparing test for ${JSON.stringify(monitoringConfiguration)}`)
+
+  let metricObjects =  statics.initMetricObjects(monitoringConfiguration);
+
+  let metricContex = {
+      testId: `${monitoringConfiguration.appName}_${monitoringConfiguration.apiName}_${monitoringConfiguration.type}`,
+      baseTelemetryData : metricObjects.telemetry,
+      baseEventData : metricObjects.event,
+      monitoringConfiguration: monitoringConfiguration,
+      apiMetrics: null,
+      certMetrics: null
+  }
+
+  return utils.checkApi(metricContex, httpClient)
+  .then(utils.certChecker(sslClient))
+  .then(utils.telemetrySender(telemetryClient))
+  .then(utils.eventSender(telemetryClient))
+
+}
 
 //start process
 main()
