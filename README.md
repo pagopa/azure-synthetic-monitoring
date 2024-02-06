@@ -7,8 +7,30 @@ Azure function to monitor internal and external service status, reporting to App
 
 ## Configuration
 
-This application relies on a configuration structure that defines what to test and how to test it. here's an example
+This application relies on a configuration structure stored on the configured table storage structured as follows:
 
+
+| Column Name      | description                                                                                                                                    | required |
+|------------------|------------------------------------------------------------------------------------------------------------------------------------------------|----------|
+| PartitionKey     | string. name of the app being monitored                                                                                                        | yes      |
+| RowKey           | string. name of the api being monitored                                                                                                        | yes      |
+| url              | string. url to be monitored                                                                                                                    | yes      |
+| method           | string, upper case. method to be used when invoking `url`                                                                                      | yes      |
+| body             | json stringifyied. body of the to be provided during the request. Allowed only when `method` is `PATCH`, `POST`, `DELETE`, `PUT`                                                                             | no       |
+| expectedCodes    | json stringifyied string. list of string and ranges (eg "200-220") of accepted http status (considered a success for the availability metric)  | yes      |
+| type             | string. identified of the api type being called. suggested types: `private`, `public`                                                          | yes      |
+| checkCertificate | boolean. if true, also checks the server's certificate (expiration, version)                                                                   | yes      |
+| durationLimit    | number. threshold, in milliseconds, over which a response time will trigger a failed availability test. to not be confused with `HTTP_CLIENT_TIMEOUT` env variable | yes      |
+| tags             | json stringifyied. dictionary of tags to be added to the tracked metrics                                                                       | yes      |
+| headers          | json stringifyied. dictionary of headers to be sent in the http request                                                                        | no       |
+
+Note on the `type`: any value is accepted, it will be traced in the application insight availability panel as "runLocation". 
+suggested values are:
+  - `private`: means that the api being tested is reached through internal network (vnet)
+  - `public`: means that the api being tested is reached through internet
+
+
+here's an example in json format to better understand the content
 ```json
 {
   "apiName": "post",
@@ -32,24 +54,6 @@ This application relies on a configuration structure that defines what to test a
 }
 ```
 
-where:
-
-- `apiName`: name of the api that is being tested
-- `appName`: name of the app which exposes the `apiName`. Note that the pair `apiName`-`appName` must be unique
-- `url`: url used for the test
-- `method`: http method used for the test
-- `type`: type of the test. Any value is accepted, it will be traced in the application insight availability panel as "runLocation". 
-  - suggested values are:
-    - `private`: means that the api being tested is reached through internal network (vnet)
-    - `public`: means that the api being tested is reached through internet
-- `checkCertificate`: if specified, the application will check the expiration date of the certificate associated to the provided domain
-- `expectedCodes`: list of strings or ranges, defined as `min-max`. contains all the http status codes that will be considered OK and will lead to a success state
-- `headers`: dictionary of additional headers to be used when performing the request. Useful when sending a body
-- `body`: object, string or anything else that will be sent in the request. Allowed only when method is `PATCH`, `POST`, `DELETE`, `PUT`
-- `durationLimit`: threshold, in milliseconds, over which a response time will trigger a failed availability test
-- `tags`: additional attributes that will be associated to the availability metric, useful to describe, identify and make searchable the metric
-
-
 ## Certificate check
 
 When enabled, the application will check the certificate associated to the configured domain in addition to checking the configured api
@@ -68,3 +72,6 @@ When checking the certificate, the suffix `-cert` will be appended to the "runLo
 | HTTP_CLIENT_TIMEOUT           | timeout used by the http client performing the availability requests                           | yes      | -         |
 | LOCATION                      | region name where this job is run                                                              | yes      | -         |
 
+## Deploy
+
+To deploy this job you can use the module `monitoring_function` provided in [terraform-azurerm-v3](https://github.com/pagopa/terraform-azurerm-v3)
