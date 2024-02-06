@@ -4,9 +4,19 @@ const statics = require('./statics')
 
 module.exports = {
     trackSelfAvailabilityEvent,
-    testIt
+    certChecker,
+    eventSender,
+    telemetrySender,
+    checkApi
 }
 
+/**
+ * 
+ * @param {telemetryData} toTrack base event to use for tracking availability 
+ * @param {Date} startTime when the elaboration started
+ * @param {TelemetryClient} telemetryClient appInsight client
+ * @param {string} result message to be attached to the event
+ */
 function trackSelfAvailabilityEvent(toTrack, startTime, telemetryClient, result){
     let event = {
         ...toTrack,
@@ -18,27 +28,12 @@ function trackSelfAvailabilityEvent(toTrack, startTime, telemetryClient, result)
 
 
 
-async function testIt(monitoringConfiguration, telemetryClient, sslClient, httpClient){
-    console.log(`preparing test for ${JSON.stringify(monitoringConfiguration)}`)
 
-    let metricObjects =  statics.initMetricObjects(monitoringConfiguration);
-
-    let metricContex = {
-        testId: `${monitoringConfiguration.appName}_${monitoringConfiguration.apiName}_${monitoringConfiguration.type}`,
-        baseTelemetryData : metricObjects.telemetry,
-        baseEventData : metricObjects.event,
-        monitoringConfiguration: monitoringConfiguration,
-        apiMetrics: null,
-        certMetrics: null
-    }
-
-    return checkApi(metricContex, httpClient)
-    .then(certChecker(sslClient))
-    .then(telemetrySender(telemetryClient))
-    .then(eventSender(telemetryClient))
-
-}
-
+/**
+ * sends a custom event to appInsight 
+ * @param {TelemetryClient} client 
+ * @returns  an async function that receives and returns the metric context
+ */
 function eventSender(client){
     return async function(metricContext){
         let enrichedMeasurements = statics.enrichData(metricContext.baseEventData.measurements, metricContext.apiMetrics, constants.keysForEvent)
@@ -58,17 +53,21 @@ function eventSender(client){
 }
 
 
-
+/**
+ * sends the availability metrics according to what is found in the metric context
+ * @param {TelemetryClient} client 
+ * @returns  an async function that receives and returns the metric context
+ */
 function telemetrySender(client){
     return async function(metricContext){
         //merge monitoring results and send
-        if (metricContext.apiMetrics){
+        if (metricContext.apiMetrics && Object.keys(metricContext.apiMetrics).length > 0 ){
             let apiTelemetryData = statics.enrichData(metricContext.baseTelemetryData, metricContext.apiMetrics, constants.keysForTelemetry);
             console.log(`tracking api telemetry for ${metricContext.testId} : ${JSON.stringify(apiTelemetryData)}`)
             client.trackAvailability(apiTelemetryData);
         }
 
-        if (metricContext.certMetrics){
+        if (metricContext.certMetrics && Object.keys(metricContext.certMetrics).length > 0){
             let certTelemetryData = statics.enrichData(metricContext.baseTelemetryData, metricContext.certMetrics, constants.keysForTelemetry);
             console.log(`tracking cert telemetry for ${metricContext.testId}: ${JSON.stringify(certTelemetryData)}`)
             client.trackAvailability(certTelemetryData);
@@ -78,6 +77,11 @@ function telemetrySender(client){
     }
 }
 
+/**
+ * executes the ssl check required by the monitoring configuration
+ * @param {*} sslClient 
+ * @returns an async function that receives and returns the metric context
+ */
 function certChecker(sslClient){
     return async function checkCert(metricContext){
         console.log(`checking certificate for ${metricContext.testId}? ${metricContext.monitoringConfiguration.checkCertificate}`)
@@ -98,7 +102,13 @@ function certChecker(sslClient){
     }
 }
 
-
+/**
+ * calls the configured api and checks the response, populating the metric context accordingly
+ * returns a promise fulfilled when the test is executed correctly, rejected when the test execution fails
+ * @param {*} metricContext 
+ * @param {*} httpClient axios
+ * @returns promise resolved with metricContext
+ */
 async function checkApi(metricContext, httpClient){
     metricContext['startTime'] = Date.now();
     console.log(`check api for ${metricContext.testId}`)

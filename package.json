@@ -6,7 +6,8 @@
   "author": "",
   "license": "MIT",
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "coverage": "jest --coverage"
   },
   "dependencies": {
     "@azure/data-tables": "^13.2.2",

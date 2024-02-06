@@ -15,11 +15,23 @@ module.exports = {
     isStatusCodeAccepted
 }
 
-
+/**
+ * checks if the given data is null or is the string "null"
+ * @param {*} data 
+ * @returns boolean
+ */
 function isNull(data){
     return data == null || data == "null"
 }
 
+/**
+ * adds the keys defined in keyList found in checkResult to the baseData object
+ * 
+ * @param {object} baseData 
+ * @param {object} checkResult 
+ * @param {list(string)} keyList 
+ * @returns a copy of base data, enriched
+ */
 function enrichData(baseData, checkResult, keyList){
     let newData = {...baseData} //create a clone
     //merge monitoring results
@@ -32,7 +44,11 @@ function enrichData(baseData, checkResult, keyList){
 }
 
 
-
+/**
+ * parses the certificate response and populates the related metrics in the metric context
+ * @param {metricContext} metricContext 
+ * @returns an async function that receives the certResponse and returns the enriched metric context
+ */
 function certResponseElaborator(metricContext){
     return async function(certResponse){
         console.log(`cert response for ${metricContext.testId}: valid to ${certResponse.valid_to}`)
@@ -48,6 +64,11 @@ function certResponseElaborator(metricContext){
     }
 }
 
+/**
+ * parses the error received from the certificate request and populates the related metric
+ * @param {metricContext} metricContext 
+ * @returns an async function that receives an error and returns the enriched metric context
+ */
 function certErrorElaborator(metricContext){
     return async function(error){
         console.log(`cert error for ${metricContext.testId}: ${JSON.stringify(error)}`)
@@ -59,6 +80,11 @@ function certErrorElaborator(metricContext){
     }
 }
 
+/**
+ * parses the api response and populates the related metric in the metric context
+ * @param {metric context} metricContext 
+ * @returns an async function that receives a response and returns the enriched metric context
+ */
 function apiResponseElaborator(metricContext){
     return async function(response){
         console.log(`api response for ${metricContext.testId}: ${response.status}`)
@@ -80,6 +106,11 @@ function apiResponseElaborator(metricContext){
     }
 }
 
+/**
+ * parses the error received from the api request and populates the related metric
+ * @param {metricContext} metricContext 
+ * @returns an async function that receives an error and returns the enriched metric context
+ */
 function apiErrorElaborator(metricContext){
     return async function(error){
         console.log(`api error for ${metricContext.testId}: ${JSON.stringify(error.message)}`)
@@ -97,6 +128,11 @@ function apiErrorElaborator(metricContext){
 }
 
 
+/**
+ * parses a string containing the tls version and returns the version as a number
+ * @param {string} versionString 
+ * @returns the number representing the tls version
+ */
 function extractTlsVersion(versionString){
     if (versionString != null){
         // Utilizza una espressione regolare per estrarre la parte numerica
@@ -110,6 +146,12 @@ function extractTlsVersion(versionString){
 
 }
 
+/**
+ * creates the http request based on the given monitoring configuration
+ * built for axios client
+ * @param {monitoringConfiguration} monitoringConfiguration 
+ * @returns http request configuration
+ */
 function buildRequest(monitoringConfiguration){
     let request = {
             method: monitoringConfiguration.method.toLowerCase(),
@@ -131,6 +173,11 @@ function buildRequest(monitoringConfiguration){
     return request;
 }
 
+/**
+ * creates the basic metric objects used to track availability and events in app insight
+ * @param {monitoringConfiguration} monitoringConfiguration 
+ * @returns object containing 'telemetry' and 'event' base data
+ */
 function initMetricObjects(monitoringConfiguration){
     let testId = `${monitoringConfiguration.appName}-${monitoringConfiguration.apiName}`
 
@@ -167,6 +214,12 @@ function initMetricObjects(monitoringConfiguration){
     };
 }
 
+/**
+ * check ifthe given status code is present in the list of acceptedCodes (single or range)
+ * @param {*} statusCode to check
+ * @param {list(string)} acceptedCodes list of codes, can also include ranges defined as "min-max" eg: "200-205"
+ * @returns boolean
+ */
 function isStatusCodeAccepted(statusCode, acceptedCodes){
     let accepted = false;
     acceptedCodes.forEach((codeRange) =>  {
