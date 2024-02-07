@@ -101,7 +101,7 @@ async function main() {
     }
 
     Promise.all(tests)
-                 .then((result) => {console.log("SUCCESS"); utils.trackSelfAvailabilityEvent(successMonitoringEvent, startTime, client, result);})
+                 .then((result) => {console.log("SUCCESS"); utils.trackSelfAvailabilityEvent(successMonitoringEvent, startTime, client, "ok");})
                  .catch((error) => {console.error(`FAILURE: ${error}`); utils.trackSelfAvailabilityEvent(failedMonitoringEvent, startTime, client, error);})
 };
 
@@ -109,9 +109,9 @@ async function main() {
 /**
  * executes the test configured by a monitoring configuration, sends the generated telemetry and events
  * returns a promise fullfilled when the thest is ran (any outcome), rejected when the execution fails
- * @param {monitoringConfiguration} monitoringConfiguration 
- * @param {TelemetryClient} telemetryClient 
- * @param {*} sslClient 
+ * @param {monitoringConfiguration} monitoringConfiguration
+ * @param {TelemetryClient} telemetryClient
+ * @param {*} sslClient
  * @param {axios} httpClient axios client
  * @returns promise rejected in case of a test EXECUTION failure
  */
