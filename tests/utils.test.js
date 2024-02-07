@@ -238,6 +238,25 @@ describe('telemetrySender tests', () => {
             expect(trackAvailability).toHaveBeenCalledTimes(1);
         })
     });
+
+    test('trackAvailability not called when cert metric provided but checkCertificate is false', () => {
+
+        dummyMetricContex.certMetrics = {
+            'duration': 100, 
+            'targetStatus': 1,
+            'targetExpirationTimestamp': 1000,
+            'httpStatus': 200,
+            'targetTlsVersion': 1.3,
+            'targetExpireInDays': 8,
+            'domain': "foo",
+            'checkCert': true
+        }
+        dummyMetricContex.monitoringConfiguration.checkCertificate = false
+      
+        return utils.telemetrySender(dummyTelemetryClient)(dummyMetricContex).then(data =>{
+            expect(trackAvailability).toHaveBeenCalledTimes(0);
+        })
+    });
     
 })
 
