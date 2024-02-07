@@ -67,7 +67,7 @@ function telemetrySender(client){
             client.trackAvailability(apiTelemetryData);
         }
 
-        if (metricContext.certMetrics && Object.keys(metricContext.certMetrics).length > 0){
+        if (metricContext.certMetrics && Object.keys(metricContext.certMetrics).length > 0 && metricContext.monitoringConfiguration.checkCertificate){
             let certTelemetryData = statics.enrichData(metricContext.baseTelemetryData, metricContext.certMetrics, constants.keysForTelemetry);
             console.log(`tracking cert telemetry for ${metricContext.testId}: ${JSON.stringify(certTelemetryData)}`)
             client.trackAvailability(certTelemetryData);
