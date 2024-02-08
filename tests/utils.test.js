@@ -318,7 +318,7 @@ describe('certChecker tests', () => {
         }
 
         expected.certMetrics['success'] = true;
-        expected.certMetrics['certSuccess'] = true
+        expected.certMetrics['certSuccess'] = 1
         expected.certMetrics['checkCert'] = true
         expected.certMetrics['targetExpireInDays'] = 10
         expected.certMetrics['targetExpirationTimestamp'] = expirationDate.getTime();

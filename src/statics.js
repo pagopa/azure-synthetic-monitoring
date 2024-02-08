@@ -17,7 +17,7 @@ module.exports = {
 
 /**
  * checks if the given data is null or is the string "null"
- * @param {*} data 
+ * @param {*} data
  * @returns boolean
  */
 function isNull(data){
@@ -26,10 +26,10 @@ function isNull(data){
 
 /**
  * adds the keys defined in keyList found in checkResult to the baseData object
- * 
- * @param {object} baseData 
- * @param {object} checkResult 
- * @param {list(string)} keyList 
+ *
+ * @param {object} baseData
+ * @param {object} checkResult
+ * @param {list(string)} keyList
  * @returns a copy of base data, enriched
  */
 function enrichData(baseData, checkResult, keyList){
@@ -46,7 +46,7 @@ function enrichData(baseData, checkResult, keyList){
 
 /**
  * parses the certificate response and populates the related metrics in the metric context
- * @param {metricContext} metricContext 
+ * @param {metricContext} metricContext
  * @returns an async function that receives the certResponse and returns the enriched metric context
  */
 function certResponseElaborator(metricContext){
@@ -55,7 +55,7 @@ function certResponseElaborator(metricContext){
         let validTo = new Date(certResponse.valid_to);
         const millisToExpiration = validTo - Date.now();
         metricContext.certMetrics['success'] = millisToExpiration > 604800000; //7 days in millis
-        metricContext.certMetrics['certSuccess'] = millisToExpiration > 604800000
+        metricContext.certMetrics['certSuccess'] = millisToExpiration > 604800000 ? 1 : 0
         metricContext.certMetrics['targetExpireInDays'] = Math.floor(millisToExpiration / 86400000); //convert in days
         metricContext.certMetrics['targetExpirationTimestamp'] = validTo.getTime();
         metricContext.certMetrics['runLocation'] = `${metricContext.monitoringConfiguration.type}-cert`
@@ -66,7 +66,7 @@ function certResponseElaborator(metricContext){
 
 /**
  * parses the error received from the certificate request and populates the related metric
- * @param {metricContext} metricContext 
+ * @param {metricContext} metricContext
  * @returns an async function that receives an error and returns the enriched metric context
  */
 function certErrorElaborator(metricContext){
@@ -82,7 +82,7 @@ function certErrorElaborator(metricContext){
 
 /**
  * parses the api response and populates the related metric in the metric context
- * @param {metric context} metricContext 
+ * @param {metric context} metricContext
  * @returns an async function that receives a response and returns the enriched metric context
  */
 function apiResponseElaborator(metricContext){
@@ -108,7 +108,7 @@ function apiResponseElaborator(metricContext){
 
 /**
  * parses the error received from the api request and populates the related metric
- * @param {metricContext} metricContext 
+ * @param {metricContext} metricContext
  * @returns an async function that receives an error and returns the enriched metric context
  */
 function apiErrorElaborator(metricContext){
@@ -130,7 +130,7 @@ function apiErrorElaborator(metricContext){
 
 /**
  * parses a string containing the tls version and returns the version as a number
- * @param {string} versionString 
+ * @param {string} versionString
  * @returns the number representing the tls version
  */
 function extractTlsVersion(versionString){
@@ -149,7 +149,7 @@ function extractTlsVersion(versionString){
 /**
  * creates the http request based on the given monitoring configuration
  * built for axios client
- * @param {monitoringConfiguration} monitoringConfiguration 
+ * @param {monitoringConfiguration} monitoringConfiguration
  * @returns http request configuration
  */
 function buildRequest(monitoringConfiguration){
@@ -175,7 +175,7 @@ function buildRequest(monitoringConfiguration){
 
 /**
  * creates the basic metric objects used to track availability and events in app insight
- * @param {monitoringConfiguration} monitoringConfiguration 
+ * @param {monitoringConfiguration} monitoringConfiguration
  * @returns object containing 'telemetry' and 'event' base data
  */
 function initMetricObjects(monitoringConfiguration){

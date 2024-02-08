@@ -71,34 +71,34 @@ describe('enrichData tests', () => {
     let result = {"additional": "foo"}
     let expected = baseData
     let keysToAdd = ["other"]
-  
+
     expect(statics.enrichData(baseData, result, keysToAdd)).toEqual(expected);
   });
-  
+
   test('adds only defined keys', () => {
     let baseData = {"foo": "bar"}
     let result = {"additional": "foo", "other": "bar"}
     let expected = {"foo": "bar", "additional": "foo"}
     let keysToAdd = ["additional"]
-  
+
     expect(statics.enrichData(baseData, result, keysToAdd)).toEqual(expected);
   });
-  
+
   test('raises no exceptions when keys is empty', () => {
     let baseData = {"foo": "bar"}
     let result = {"additional": "foo", "other": "bar"}
     let expected = {"foo": "bar"}
     let keysToAdd = []
-  
+
     expect(statics.enrichData(baseData, result, keysToAdd)).toEqual(expected);
   });
-  
+
   test('raises no exceptions when keys is not in result', () => {
     let baseData = {"foo": "bar"}
     let result = {"additional": "foo"}
     let expected = {"foo": "bar"}
     let keysToAdd = ["other"]
-  
+
     expect(statics.enrichData(baseData, result, keysToAdd)).toEqual(expected);
   });
 })
@@ -112,37 +112,37 @@ describe('certResponseElaborator tests', () => {
     let mockCertResponse = {valid_to: validTo}
     let expectedCertMetric = {
       success : true,
-      certSuccess : true,
+      certSuccess : 1,
       targetExpireInDays: 9,
       targetExpirationTimestamp : validTo.getTime(),
       runLocation: `${dummyMetricContex.monitoringConfiguration.type}-cert`
     }
-  
-  
+
+
     return statics.certResponseElaborator(dummyMetricContex)(mockCertResponse).then(data =>{
       expect(data).toMatchObject({ certMetrics: expectedCertMetric});
     })
-    
+
   });
-  
-  
+
+
   test('returns false when cert expires in less than 7 days', () => {
     let validTo = new Date();
     validTo.setDate(validTo.getDate() + 6);
     let mockCertResponse = {valid_to: validTo}
     let expectedCertMetric = {
       success : false,
-      certSuccess : false,
+      certSuccess : 0,
       targetExpireInDays: 6,
       targetExpirationTimestamp : validTo.getTime(),
       runLocation: `${dummyMetricContex.monitoringConfiguration.type}-cert`
     }
-  
-  
+
+
     return statics.certResponseElaborator(dummyMetricContex)(mockCertResponse).then(data =>{
       expect(data).toMatchObject({ certMetrics: expectedCertMetric});
     })
-    
+
   });
 })
 
@@ -157,12 +157,12 @@ describe('certErrorElaborator tests', () => {
       message: "foo",
       runLocation: `${dummyMetricContex.monitoringConfiguration.type}-cert`
     }
-  
-  
+
+
     return statics.certErrorElaborator(dummyMetricContex)({"message": "foo"}).then(data =>{
       expect(data).toMatchObject({ certMetrics: expectedCertMetric});
     })
-    
+
   });
 })
 
@@ -181,14 +181,14 @@ describe('apiResponseElaborator tests', () => {
       targetStatus: 1,
       targetTlsVersion: 1.3
     }
-  
-  
+
+
     return statics.apiResponseElaborator(dummyMetricContex)(mockApiResponse).then(data =>{
       expect(data).toMatchObject({ apiMetrics: expectedApiMetric});
     })
-    
+
   });
-  
+
   test('returns false when api response not ok', () => {
     let mockApiResponse = {
       status: 500,
@@ -202,15 +202,15 @@ describe('apiResponseElaborator tests', () => {
       targetStatus: 0,
       targetTlsVersion: 1.3
     }
-  
-  
+
+
     return statics.apiResponseElaborator(dummyMetricContex)(mockApiResponse).then(data =>{
       expect(data).toMatchObject({ apiMetrics: expectedApiMetric});
     })
-    
+
   });
-  
-  
+
+
   test('returns false when api response ok but took too long', () => {
     let mockApiResponse = {
       status: 200,
@@ -224,12 +224,12 @@ describe('apiResponseElaborator tests', () => {
       targetStatus: 1,
       targetTlsVersion: 1.3
     }
-  
-  
+
+
     return statics.apiResponseElaborator(dummyMetricContex)(mockApiResponse).then(data =>{
       expect(data).toMatchObject({ apiMetrics: expectedApiMetric});
     })
-    
+
   });
 })
 
@@ -241,49 +241,49 @@ describe('apiErrorElaborator tests', () => {
       targetStatus: 0,
       message: "foo"
     }
-  
-  
+
+
     return statics.apiErrorElaborator(dummyMetricContex)({message: "foo"}).then(data =>{
       expect(data).toMatchObject({ apiMetrics: expectedApiMetric});
     })
-    
+
   });
-}) 
+})
 
 
 describe('extractTlsVersion tests', () => {
   test('returns 0 if tls version empty string', () => {
     let versionString = ""
     let expected = 0
-  
+
     expect(statics.extractTlsVersion(versionString)).toEqual(expected);
   });
-  
+
   test('returns 0 if tls version null', () => {
     let versionString = null
     let expected = 0
-  
+
     expect(statics.extractTlsVersion(versionString)).toEqual(expected);
   });
-  
+
   test('returns 0 if tls version not valid', () => {
     let versionString = "foo"
     let expected = 0
-  
+
     expect(statics.extractTlsVersion(versionString)).toEqual(expected);
   });
-  
+
   test('returns valid tls version', () => {
     let versionString = "v1.3"
     let expected = 1.3
-  
+
     expect(statics.extractTlsVersion(versionString)).toEqual(expected);
   });
-  
+
   test('returns valid tls version when missing leading v', () => {
     let versionString = "1.3"
     let expected = 1.3
-  
+
     expect(statics.extractTlsVersion(versionString)).toEqual(expected);
   });
 })
@@ -310,10 +310,10 @@ describe('buildRequest tests', () => {
       url: "https://myUrl.com",
       timeout: 1000
   }
-  
+
     expect(statics.buildRequest(monitoringConfiguration)).toMatchObject(expected);
   });
-  
+
   test('ignores body on get request ', () => {
     let monitoringConfiguration = {
       "apiName" : "aks_ingress",
@@ -335,11 +335,11 @@ describe('buildRequest tests', () => {
       url: "https://myUrl.com",
       timeout: 1000
   }
-  
+
     expect(statics.buildRequest(monitoringConfiguration)).toMatchObject(expected);
     expect(statics.buildRequest(monitoringConfiguration)).toEqual(expect.not.objectContaining({"data": expect.anything()}));
   });
-  
+
   test('adds headers if configured ', () => {
     let monitoringConfiguration = {
       "apiName" : "aks_ingress",
@@ -354,7 +354,7 @@ describe('buildRequest tests', () => {
       },
       "headers": {
          "foo": "bar",
-         "baz": "fooz" 
+         "baz": "fooz"
       },
       "body": "something",
       "durationLimit": 1000,
@@ -366,14 +366,14 @@ describe('buildRequest tests', () => {
       timeout: 1000,
       headers: {
         "foo": "bar",
-        "baz": "fooz" 
+        "baz": "fooz"
       }
   }
-  
+
     expect(statics.buildRequest(monitoringConfiguration)).toMatchObject(expected);
   });
-  
-  
+
+
   test('adds body when configured', () => {
     let monitoringConfiguration = {
       "apiName" : "aks_ingress",
@@ -396,7 +396,7 @@ describe('buildRequest tests', () => {
       timeout: 1000,
       data: "something"
   }
-  
+
     expect(statics.buildRequest(monitoringConfiguration)).toMatchObject(expected);
   });
 } )
@@ -406,42 +406,42 @@ describe('isStatusCodeAccepted tests', () => {
   test('returns true when code matched', () => {
     let received = 200
     let accepted = ["200"]
-  
+
     expect(statics.isStatusCodeAccepted(received, accepted)).toBe(true);
   });
-  
+
   test('returns true when code contained in list', () => {
     let received = 300
     let accepted = ["200", "300", "400"]
-  
+
     expect(statics.isStatusCodeAccepted(received, accepted)).toBe(true);
   });
-  
+
   test('returns false when code not contained in list', () => {
     let received = 500
     let accepted = ["200", "300", "400"]
-  
+
     expect(statics.isStatusCodeAccepted(received, accepted)).toBe(false);
   });
-  
+
   test('returns true when code in range', () => {
     let received = 305
     let accepted = ["200", "300-310", "400"]
-  
+
     expect(statics.isStatusCodeAccepted(received, accepted)).toBe(true);
   });
-  
+
   test('returns true when code in range lower bound', () => {
     let received = 300
     let accepted = ["200", "300-310", "400"]
-  
+
     expect(statics.isStatusCodeAccepted(received, accepted)).toBe(true);
   });
-  
+
   test('returns true when code in range upper bound', () => {
     let received = 310
     let accepted = ["200", "300-310", "400"]
-  
+
     expect(statics.isStatusCodeAccepted(received, accepted)).toBe(true);
   });
 })
@@ -480,6 +480,6 @@ describe('initMetricObjects tests', () => {
 
     expect(result).toEqual(expected);
   });
-  
-  
+
+
 })
