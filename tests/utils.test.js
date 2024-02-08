@@ -107,7 +107,7 @@ describe('eventSender tests', () => {
         return utils.eventSender(dummyTelemetryClient)(dummyMetricContex).then(data =>{
             expect(trackEvent).toHaveBeenCalledTimes(1);
         })
-        
+
       });
 
       test('calls sendEvent with base event data when no metrics provided', () => {
@@ -116,16 +116,16 @@ describe('eventSender tests', () => {
             measurements : {},
             properties: {}
         }
-      
+
         return utils.eventSender(dummyTelemetryClient)(dummyMetricContex).then(data =>{
             expect(trackEvent).toHaveBeenCalledWith(expected);
         })
-        
+
       });
 
       test('calls sendEvent with enriched event data when api metrics provided', () => {
         dummyMetricContex.apiMetrics = {
-            'duration': 100, 
+            'duration': 100,
             'targetStatus': 1,
             'targetExpirationTimestamp': 1000,
             'httpStatus': 200,
@@ -139,7 +139,7 @@ describe('eventSender tests', () => {
         let expected = {
             ...dummyMetricContex.baseEventData,
             measurements: {
-                'duration': 100, 
+                'duration': 100,
                 'targetStatus': 1,
                 'targetExpirationTimestamp': 1000,
                 'httpStatus': 200,
@@ -151,31 +151,33 @@ describe('eventSender tests', () => {
                 'checkCert': true
             }
         }
-      
+
         return utils.eventSender(dummyTelemetryClient)(dummyMetricContex).then(data =>{
             expect(trackEvent).toHaveBeenCalledWith(expected);
         })
-        
+
       });
 
       test('calls sendEvent with enriched event data when cert metrics provided', () => {
         dummyMetricContex.certMetrics = {
-            'duration': 100, 
+            'duration': 100,
             'targetStatus': 1,
             'targetExpirationTimestamp': 1000,
             'httpStatus': 200,
             'targetTlsVersion': 1.3,
             'targetExpireInDays': 8,
             'domain': "foo",
-            'checkCert': true
+            'checkCert': true,
+            'certSuccess': 1
         }
 
 
         let expected = {
             ...dummyMetricContex.baseEventData,
             measurements: {
-                'duration': 100, 
+                'duration': 100,
                 'targetStatus': 1,
+                'certSuccess': 1,
                 'targetExpirationTimestamp': 1000,
                 'httpStatus': 200,
                 'targetTlsVersion': 1.3,
@@ -186,7 +188,7 @@ describe('eventSender tests', () => {
                 'checkCert': true
             }
         }
-      
+
         return utils.eventSender(dummyTelemetryClient)(dummyMetricContex).then(data =>{
             expect(trackEvent).toHaveBeenCalledWith(expected);
         })
@@ -197,7 +199,7 @@ describe('eventSender tests', () => {
 
 describe('telemetrySender tests', () => {
     test('not calls trackAvailability when no metric provided', () => {
-      
+
         return utils.telemetrySender(dummyTelemetryClient)(dummyMetricContex).then(data =>{
             expect(trackAvailability).toHaveBeenCalledTimes(0);
         })
@@ -206,7 +208,7 @@ describe('telemetrySender tests', () => {
 
     test('calls trackAvailability once when only api metric provided', () => {
         dummyMetricContex.apiMetrics = {
-            'duration': 100, 
+            'duration': 100,
             'targetStatus': 1,
             'targetExpirationTimestamp': 1000,
             'httpStatus': 200,
@@ -215,7 +217,7 @@ describe('telemetrySender tests', () => {
             'domain': "foo",
             'checkCert': true
         }
-      
+
         return utils.telemetrySender(dummyTelemetryClient)(dummyMetricContex).then(data =>{
             expect(trackAvailability).toHaveBeenCalledTimes(1);
         })
@@ -224,7 +226,7 @@ describe('telemetrySender tests', () => {
     test('calls trackAvailability once when only cert metric provided', () => {
 
         dummyMetricContex.certMetrics = {
-            'duration': 100, 
+            'duration': 100,
             'targetStatus': 1,
             'targetExpirationTimestamp': 1000,
             'httpStatus': 200,
@@ -233,7 +235,7 @@ describe('telemetrySender tests', () => {
             'domain': "foo",
             'checkCert': true
         }
-      
+
         return utils.telemetrySender(dummyTelemetryClient)(dummyMetricContex).then(data =>{
             expect(trackAvailability).toHaveBeenCalledTimes(1);
         })
@@ -242,7 +244,7 @@ describe('telemetrySender tests', () => {
     test('trackAvailability not called when cert metric provided but checkCertificate is false', () => {
 
         dummyMetricContex.certMetrics = {
-            'duration': 100, 
+            'duration': 100,
             'targetStatus': 1,
             'targetExpirationTimestamp': 1000,
             'httpStatus': 200,
@@ -252,12 +254,12 @@ describe('telemetrySender tests', () => {
             'checkCert': true
         }
         dummyMetricContex.monitoringConfiguration.checkCertificate = false
-      
+
         return utils.telemetrySender(dummyTelemetryClient)(dummyMetricContex).then(data =>{
             expect(trackAvailability).toHaveBeenCalledTimes(0);
         })
     });
-    
+
 })
 
 
@@ -308,17 +310,17 @@ describe('certChecker tests', () => {
         dummySslClient.get.mockReturnValue(new Promise((resolve, reject) => {
             resolve({valid_to: expirationDate})
         }))
-        
+
         dummyMetricContex.monitoringConfiguration.checkCertificate = true
 
         let expected = {
             ...dummyMetricContex
         }
 
-        expected.certMetrics['success'] = true; 
+        expected.certMetrics['success'] = true;
         expected.certMetrics['certSuccess'] = true
         expected.certMetrics['checkCert'] = true
-        expected.certMetrics['targetExpireInDays'] = 10 
+        expected.certMetrics['targetExpireInDays'] = 10
         expected.certMetrics['targetExpirationTimestamp'] = expirationDate.getTime();
         expected.certMetrics['runLocation'] = `${dummyMetricContex.monitoringConfiguration.type}-cert`
         expected.certMetrics.domain = "myhost.com"
@@ -332,7 +334,7 @@ describe('certChecker tests', () => {
         dummySslClient.get.mockReturnValue(new Promise((resolve, reject) => {
             reject({message: "error message"})
         }))
-        
+
         let myMetricContext = {
             ...dummyMetricContex
         }
@@ -342,7 +344,7 @@ describe('certChecker tests', () => {
             ...myMetricContext
         }
 
-        expected.certMetrics['success'] = false; 
+        expected.certMetrics['success'] = false;
         expected.certMetrics['checkCert'] = true
         expected.certMetrics['message'] = "error message"
         expected.certMetrics['runLocation'] = `${dummyMetricContex.monitoringConfiguration.type}-cert`
@@ -426,5 +428,5 @@ describe('checkApi tests', () => {
         })
     });
 
-    
+
 })
