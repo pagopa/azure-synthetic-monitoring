@@ -1,5 +1,6 @@
 const statusCodeRangeSeparator = "-"
 const constants = require('./const')
+const comparator = require('./comparator')
 
 
 module.exports = {
@@ -96,10 +97,10 @@ function apiResponseElaborator(metricContext){
         let duration = response[constants.RESPONSE_TIME_KEY];
         let durationOk = duration <= metricContext.monitoringConfiguration.durationLimit
 
-        
+
 
         let bodyMatches = true
-        const bodyCompareStrategy = metricContext.monitoringConfiguration.bodyCompareStrategy 
+        const bodyCompareStrategy = metricContext.monitoringConfiguration.bodyCompareStrategy
         if (!isNull(bodyCompareStrategy)){
             const expectedBody = metricContext.monitoringConfiguration.expectedBody
             bodyMatches = new comparator().getStrategy(bodyCompareStrategy)(response.body, expectedBody)
