@@ -232,6 +232,21 @@ describe('apiResponseElaborator tests', () => {
     })
 
   });
+
+  test('elaborated metric context contains api response', () => {
+    let mockApiResponse = {
+      status: 200,
+      statusText: "ok",
+      TLS_VERSION: "v1.3",
+      RESPONSE_TIME: 2000
+    }
+
+
+    return statics.apiResponseElaborator(dummyMetricContex)(mockApiResponse).then(data =>{
+      expect(data).toMatchObject({ apiResponse: mockApiResponse});
+    })
+
+  });
 })
 
 
