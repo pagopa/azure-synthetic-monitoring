@@ -16,6 +16,7 @@ const tableName = process.env.STORAGE_ACCOUNT_TABLE_NAME
 const availabilityPrefix = process.env.AVAILABILITY_PREFIX
 const httpClientTimeout = process.env.HTTP_CLIENT_TIMEOUT
 const location = process.env.LOCATION
+const certValidityRangeDays = process.env.CERT_VALIDITY_RANGE_DAYS
 
 appInsights.setup(process.env.APP_INSIGHT_CONNECTION_STRING).start();
 
@@ -84,7 +85,8 @@ async function main() {
                 expectedCodes: !statics.isNull(tableConfiguration['expectedCodes']) ? JSON.parse(tableConfiguration['expectedCodes']) : null,
                 durationLimit: tableConfiguration.durationLimit,
                 httpClientTimeout,
-                availabilityPrefix
+                availabilityPrefix,
+                certValidityRangeDays
             }
             console.log(`monitoringConfiguration: ${JSON.stringify(monitoringConfiguration)}`)
 

@@ -25,7 +25,8 @@ const dummyMetricContex = {
           "description": "description"
       },
       "durationLimit": 1000,
-      "availabilityPrefix": "synthetic"
+      "availabilityPrefix": "synthetic",
+      "certValidityRangeDays": 7
   },
   apiMetrics: {},
   certMetrics: {}

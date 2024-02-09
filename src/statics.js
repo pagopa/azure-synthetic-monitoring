@@ -51,11 +51,12 @@ function enrichData(baseData, checkResult, keyList){
  */
 function certResponseElaborator(metricContext){
     return async function(certResponse){
+        const millisBeforeExpiration = metricContext.monitoringConfiguration.certValidityRangeDays * 24 * 60 * 60 * 1000
         console.log(`cert response for ${metricContext.testId}: valid to ${certResponse.valid_to}`)
         let validTo = new Date(certResponse.valid_to);
         const millisToExpiration = validTo - Date.now();
-        metricContext.certMetrics['success'] = millisToExpiration > 604800000; //7 days in millis
-        metricContext.certMetrics['certSuccess'] = millisToExpiration > 604800000 ? 1 : 0
+        metricContext.certMetrics['success'] = millisToExpiration > millisBeforeExpiration;
+        metricContext.certMetrics['certSuccess'] = millisToExpiration > millisBeforeExpiration ? 1 : 0
         metricContext.certMetrics['targetExpireInDays'] = Math.floor(millisToExpiration / 86400000); //convert in days
         metricContext.certMetrics['targetExpirationTimestamp'] = validTo.getTime();
         metricContext.certMetrics['runLocation'] = `${metricContext.monitoringConfiguration.type}-cert`
@@ -95,7 +96,7 @@ function apiResponseElaborator(metricContext){
         let apiMetrics = {
           duration,
           success : statusCodeOk && durationOk,
-          message : !statusCodeOk ? `status code not valid: ${response.statusText}` : (!durationOk ? `time limit exceeded: ${duration} > ${metricContext.monitoringConfiguration.durationLimit}` : `${response.statusText}`),
+          message : !statusCodeOk ? `status code ${response.status} not valid: ${response.statusText}` : (!durationOk ? `time limit exceeded: ${duration} > ${metricContext.monitoringConfiguration.durationLimit}` : `${response.statusText}`),
           httpStatus : response.status,
           targetStatus : statusCodeOk ? 1 : 0,
           targetTlsVersion : extractTlsVersion(response[constants.TLS_VERSION_KEY])

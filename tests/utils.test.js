@@ -57,7 +57,8 @@ beforeEach(() => {
             "tags": {
                 "description": "AKS ingress tested from internal network"
             },
-            "durationLimit": 10000
+            "durationLimit": 10000,
+            "certValidityRangeDays": "7"
         },
         apiMetrics: {},
         certMetrics: {}

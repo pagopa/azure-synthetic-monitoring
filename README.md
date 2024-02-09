@@ -62,15 +62,16 @@ When checking the certificate, the suffix `-cert` will be appended to the "runLo
 
 ## Env variables
 
-| name                          | description                                                                                    | required | default   |
-|-------------------------------|------------------------------------------------------------------------------------------------|----------|-----------|
-| APP_INSIGHT_CONNECTION_STRING | application insight connection string. where to publish availability metrics and custom events | yes      | -         |
-| STORAGE_ACCOUNT_NAME          | storage account name used to store the monitoring configuration                                | yes      | -         |
-| STORAGE_ACCOUNT_KEY           | storage account access key                                                                     | yes      | -         |
-| STORAGE_ACCOUNT_TABLE_NAME    | table name used to store the monitoring configuration                                          | yes      | -         |
-| AVAILABILITY_PREFIX           | prefix used in the custom metric and events names                                              | no       | synthetic |
-| HTTP_CLIENT_TIMEOUT           | timeout used by the http client performing the availability requests                           | yes      | -         |
-| LOCATION                      | region name where this job is run                                                              | yes      | -         |
+| name                          | description                                                                                           | required | default   |
+|-------------------------------|-------------------------------------------------------------------------------------------------------|----------|-----------|
+| APP_INSIGHT_CONNECTION_STRING | application insight connection string. where to publish availability metrics and custom events        | yes      | -         |
+| STORAGE_ACCOUNT_NAME          | storage account name used to store the monitoring configuration                                       | yes      | -         |
+| STORAGE_ACCOUNT_KEY           | storage account access key                                                                            | yes      | -         |
+| STORAGE_ACCOUNT_TABLE_NAME    | table name used to store the monitoring configuration                                                 | yes      | -         |
+| AVAILABILITY_PREFIX           | prefix used in the custom metric and events names                                                     | no       | synthetic |
+| HTTP_CLIENT_TIMEOUT           | timeout used by the http client performing the availability requests                                  | yes      | -         |
+| LOCATION                      | region name where this job is run                                                                     | yes      | -         |
+| CERT_VALIDITY_RANGE_DAYS      | number of days before the expiration date of a certificate over which the check is considered success | yes      | -         |
 
 ## Deploy
 
