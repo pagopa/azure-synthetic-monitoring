@@ -1,5 +1,6 @@
 const statusCodeRangeSeparator = "-"
 const constants = require('./const')
+const comparator = require('./comparator')
 
 
 module.exports = {
@@ -21,7 +22,7 @@ module.exports = {
  * @returns boolean
  */
 function isNull(data){
-    return data == null || data == "null"
+    return data == null || data == "null" || data == undefined
 }
 
 /**
@@ -51,11 +52,12 @@ function enrichData(baseData, checkResult, keyList){
  */
 function certResponseElaborator(metricContext){
     return async function(certResponse){
+        const millisBeforeExpiration = metricContext.monitoringConfiguration.certValidityRangeDays * 24 * 60 * 60 * 1000
         console.log(`cert response for ${metricContext.testId}: valid to ${certResponse.valid_to}`)
         let validTo = new Date(certResponse.valid_to);
         const millisToExpiration = validTo - Date.now();
-        metricContext.certMetrics['success'] = millisToExpiration > 604800000; //7 days in millis
-        metricContext.certMetrics['certSuccess'] = millisToExpiration > 604800000 ? 1 : 0
+        metricContext.certMetrics['success'] = millisToExpiration > millisBeforeExpiration;
+        metricContext.certMetrics['certSuccess'] = millisToExpiration > millisBeforeExpiration ? 1 : 0
         metricContext.certMetrics['targetExpireInDays'] = Math.floor(millisToExpiration / 86400000); //convert in days
         metricContext.certMetrics['targetExpirationTimestamp'] = validTo.getTime();
         metricContext.certMetrics['runLocation'] = `${metricContext.monitoringConfiguration.type}-cert`
@@ -90,17 +92,39 @@ function apiResponseElaborator(metricContext){
         console.log(`api response for ${metricContext.testId}: ${response.status}`)
         let statusCodeOk = isStatusCodeAccepted(response.status, metricContext.monitoringConfiguration.expectedCodes)
         console.log(`status code accepted for ${metricContext.testId}? ${statusCodeOk}`)
+        let errorMessage = ""
+
         let duration = response[constants.RESPONSE_TIME_KEY];
         let durationOk = duration <= metricContext.monitoringConfiguration.durationLimit
+
+        let bodyMatches = true
+        const bodyCompareStrategy = metricContext.monitoringConfiguration.bodyCompareStrategy
+        if (!isNull(bodyCompareStrategy)){
+            const expectedBody = metricContext.monitoringConfiguration.expectedBody
+            bodyMatches =  comparator.compare(bodyCompareStrategy, response.data, expectedBody)
+        }
+
+        if(!statusCodeOk){
+            errorMessage = errorMessage + `status code ${response.status} not valid: ${response.statusText} `
+        }
+        if(!durationOk) {
+            errorMessage = errorMessage + `time limit exceeded: ${duration} > ${metricContext.monitoringConfiguration.durationLimit} `
+        }
+        if(!bodyMatches){
+            errorMessage = errorMessage + `body check failed`
+        }
+        const success = statusCodeOk && durationOk && bodyMatches
+
         let apiMetrics = {
           duration,
-          success : statusCodeOk && durationOk,
-          message : !statusCodeOk ? `status code not valid: ${response.statusText}` : (!durationOk ? `time limit exceeded: ${duration} > ${metricContext.monitoringConfiguration.durationLimit}` : `${response.statusText}`),
+          success,
+          message : success ? `${response.statusText}` : errorMessage,
           httpStatus : response.status,
           targetStatus : statusCodeOk ? 1 : 0,
           targetTlsVersion : extractTlsVersion(response[constants.TLS_VERSION_KEY])
         }
         metricContext.apiMetrics = apiMetrics
+        metricContext.apiResponse = response
 
         return metricContext
     }

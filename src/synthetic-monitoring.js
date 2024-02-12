@@ -16,6 +16,7 @@ const tableName = process.env.STORAGE_ACCOUNT_TABLE_NAME
 const availabilityPrefix = process.env.AVAILABILITY_PREFIX
 const httpClientTimeout = process.env.HTTP_CLIENT_TIMEOUT
 const location = process.env.LOCATION
+const certValidityRangeDays = process.env.CERT_VALIDITY_RANGE_DAYS
 
 appInsights.setup(process.env.APP_INSIGHT_CONNECTION_STRING).start();
 
@@ -71,8 +72,7 @@ async function main() {
     let tests = []
     const startTime = Date.now();
     for await (const tableConfiguration of tableEntities) {
-
-        try{
+    try{
             //property names remap and parsing
             let monitoringConfiguration = {
                 ...tableConfiguration,
@@ -82,9 +82,12 @@ async function main() {
                 body: !statics.isNull(tableConfiguration['body']) ? JSON.parse(tableConfiguration['body']) : null,
                 headers: !statics.isNull(tableConfiguration['headers'])? JSON.parse(tableConfiguration['headers']) : null,
                 expectedCodes: !statics.isNull(tableConfiguration['expectedCodes']) ? JSON.parse(tableConfiguration['expectedCodes']) : null,
+                bodyCompareStrategy: !statics.isNull(tableConfiguration['bodyCompareStrategy']) ? tableConfiguration['bodyCompareStrategy'] : null,
+                expectedBody: !statics.isNull(tableConfiguration['expectedBody']) ? JSON.parse(tableConfiguration['expectedBody']) : null,
                 durationLimit: tableConfiguration.durationLimit,
                 httpClientTimeout,
-                availabilityPrefix
+                availabilityPrefix,
+                certValidityRangeDays
             }
             console.log(`monitoringConfiguration: ${JSON.stringify(monitoringConfiguration)}`)
 

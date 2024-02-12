@@ -11,8 +11,8 @@ module.exports = {
 }
 
 /**
- * 
- * @param {telemetryData} toTrack base event to use for tracking availability 
+ *
+ * @param {telemetryData} toTrack base event to use for tracking availability
  * @param {Date} startTime when the elaboration started
  * @param {TelemetryClient} telemetryClient appInsight client
  * @param {string} result message to be attached to the event
@@ -30,8 +30,8 @@ function trackSelfAvailabilityEvent(toTrack, startTime, telemetryClient, result)
 
 
 /**
- * sends a custom event to appInsight 
- * @param {TelemetryClient} client 
+ * sends a custom event to appInsight
+ * @param {TelemetryClient} client
  * @returns  an async function that receives and returns the metric context
  */
 function eventSender(client){
@@ -55,7 +55,7 @@ function eventSender(client){
 
 /**
  * sends the availability metrics according to what is found in the metric context
- * @param {TelemetryClient} client 
+ * @param {TelemetryClient} client
  * @returns  an async function that receives and returns the metric context
  */
 function telemetrySender(client){
@@ -79,7 +79,7 @@ function telemetrySender(client){
 
 /**
  * executes the ssl check required by the monitoring configuration
- * @param {*} sslClient 
+ * @param {*} sslClient
  * @returns an async function that receives and returns the metric context
  */
 function certChecker(sslClient){
@@ -105,13 +105,13 @@ function certChecker(sslClient){
 /**
  * calls the configured api and checks the response, populating the metric context accordingly
  * returns a promise fulfilled when the test is executed correctly, rejected when the test execution fails
- * @param {*} metricContext 
+ * @param {*} metricContext
  * @param {*} httpClient axios
  * @returns promise resolved with metricContext
  */
 async function checkApi(metricContext, httpClient){
     metricContext['startTime'] = Date.now();
-    console.log(`check api for ${metricContext.testId}`)
+    console.log(`check api for ${metricContext.testId}, ${JSON.stringify(statics.buildRequest(metricContext.monitoringConfiguration))}`)
     return httpClient(statics.buildRequest(metricContext.monitoringConfiguration))
         .then(statics.apiResponseElaborator(metricContext))
         .catch(statics.apiErrorElaborator(metricContext))

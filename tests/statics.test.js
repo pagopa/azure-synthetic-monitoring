@@ -1,7 +1,10 @@
 const statics = require('../src/statics')
 
 
-const dummyMetricContex = {
+let dummyMetricContex = {}
+
+beforeEach(() => {
+  dummyMetricContex = {
   testId: `my-test-id`,
   baseTelemetryData : {
     id: `my-test-id`,
@@ -25,11 +28,13 @@ const dummyMetricContex = {
           "description": "description"
       },
       "durationLimit": 1000,
-      "availabilityPrefix": "synthetic"
+      "availabilityPrefix": "synthetic",
+      "certValidityRangeDays": 7
   },
   apiMetrics: {},
   certMetrics: {}
 }
+})
 
 beforeAll(() => {
   jest.useFakeTimers('modern');
@@ -189,6 +194,52 @@ describe('apiResponseElaborator tests', () => {
 
   });
 
+  test('returns true when api response ok and body matches', () => {
+    let mockApiResponse = {
+      status: 200,
+      statusText: "ok",
+      TLS_VERSION: "v1.3",
+      RESPONSE_TIME: 100,
+      data: {"foo": "bar"}
+    }
+    let expectedApiMetric = {
+      success : true,
+      httpStatus: 200,
+      targetStatus: 1,
+      targetTlsVersion: 1.3
+    }
+    dummyMetricContex.monitoringConfiguration.bodyCompareStrategy = 'contains'
+    dummyMetricContex.monitoringConfiguration.expectedBody = {"foo": "bar"}
+
+    return statics.apiResponseElaborator(dummyMetricContex)(mockApiResponse).then(data =>{
+      expect(data).toMatchObject({ apiMetrics: expectedApiMetric});
+    })
+
+  });
+
+   test('returns false when api response ok and body match fails', () => {
+    let mockApiResponse = {
+      status: 200,
+      statusText: "ok",
+      TLS_VERSION: "v1.3",
+      RESPONSE_TIME: 100,
+      data: {"baz": "bar"}
+    }
+    let expectedApiMetric = {
+      success : false,
+      httpStatus: 200,
+      targetStatus: 1,
+      targetTlsVersion: 1.3
+    }
+    dummyMetricContex.monitoringConfiguration.bodyCompareStrategy = 'contains'
+    dummyMetricContex.monitoringConfiguration.expectedBody = {"foo": "bar"}
+
+    return statics.apiResponseElaborator(dummyMetricContex)(mockApiResponse).then(data =>{
+      expect(data).toMatchObject({ apiMetrics: expectedApiMetric});
+    })
+
+  });
+
   test('returns false when api response not ok', () => {
     let mockApiResponse = {
       status: 500,
@@ -228,6 +279,21 @@ describe('apiResponseElaborator tests', () => {
 
     return statics.apiResponseElaborator(dummyMetricContex)(mockApiResponse).then(data =>{
       expect(data).toMatchObject({ apiMetrics: expectedApiMetric});
+    })
+
+  });
+
+  test('elaborated metric context contains api response', () => {
+    let mockApiResponse = {
+      status: 200,
+      statusText: "ok",
+      TLS_VERSION: "v1.3",
+      RESPONSE_TIME: 2000
+    }
+
+
+    return statics.apiResponseElaborator(dummyMetricContex)(mockApiResponse).then(data =>{
+      expect(data).toMatchObject({ apiResponse: mockApiResponse});
     })
 
   });
