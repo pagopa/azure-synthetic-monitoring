@@ -72,8 +72,7 @@ async function main() {
     let tests = []
     const startTime = Date.now();
     for await (const tableConfiguration of tableEntities) {
-
-        try{
+    try{
             //property names remap and parsing
             let monitoringConfiguration = {
                 ...tableConfiguration,

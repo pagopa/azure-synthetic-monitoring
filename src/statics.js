@@ -97,20 +97,18 @@ function apiResponseElaborator(metricContext){
         let duration = response[constants.RESPONSE_TIME_KEY];
         let durationOk = duration <= metricContext.monitoringConfiguration.durationLimit
 
-
-
         let bodyMatches = true
         const bodyCompareStrategy = metricContext.monitoringConfiguration.bodyCompareStrategy
         if (!isNull(bodyCompareStrategy)){
             const expectedBody = metricContext.monitoringConfiguration.expectedBody
-            bodyMatches = new comparator().getStrategy(bodyCompareStrategy)(response.body, expectedBody)
+            bodyMatches =  comparator.compare(bodyCompareStrategy, response.data, expectedBody)
         }
 
         if(!statusCodeOk){
-            errorMessage = errorMessage + `status code ${response.status} not valid: ${response.statusText}`
+            errorMessage = errorMessage + `status code ${response.status} not valid: ${response.statusText} `
         }
         if(!durationOk) {
-            errorMessage = errorMessage + `time limit exceeded: ${duration} > ${metricContext.monitoringConfiguration.durationLimit}`
+            errorMessage = errorMessage + `time limit exceeded: ${duration} > ${metricContext.monitoringConfiguration.durationLimit} `
         }
         if(!bodyMatches){
             errorMessage = errorMessage + `body check failed`

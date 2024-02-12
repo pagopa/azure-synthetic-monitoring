@@ -1,15 +1,13 @@
-class comparator {
+function compare(strategyName, actual, expected){
+  if(strategyName in strategies){
+      return strategies[strategyName](actual, expected)
+  }else {
+    // default value if strategy not found
+    return false
+  }
+}
 
-    constructor() {
-        this.compareStrategies = {
-            'contains': this.contains.bind(this),
-            'containsKeys': this.containsKeys.bind(this),
-            'listOfTypes': this.listOfTypes.bind(this),
-            'typeOf': this.typeOf.bind(this)
-        };
-    }
-
-    contains(actual, expected) {
+const contains = function (actual, expected) {
         let result = true;
         try {
             Object.keys(expected).forEach((key) => {
@@ -46,7 +44,7 @@ class comparator {
     }
 
 
-    containsKeys(actual, expected) {
+ const containsKeys = function (actual, expected) {
         let result = true;
         try {
             console.debug(`type of expected ${typeof expected} `)
@@ -95,7 +93,7 @@ class comparator {
     }
 
 
-    listOfTypes(actual, expected) {
+ const listOfTypes = function (actual, expected) {
         let result = true;
         actual.forEach((object) => {
             result = result && this.containsKeys(object, expected);
@@ -105,16 +103,21 @@ class comparator {
     };
 
 
-    typeOf (actual, expected) {
+ const typeOf = function (actual, expected) {
         let check = typeof actual == expected
         console.debug(`checking primitive type of ${actual} == ${expected}: ${check}`)
         return check;
     }
 
-    getStrategy(name) {
-        return this.compareStrategies[name]
+ const strategies = {
+        contains,
+        containsKeys,
+        listOfTypes,
+        typeOf
     }
 
-}
 
-module.exports = comparator
+
+module.exports = {
+  compare
+}
