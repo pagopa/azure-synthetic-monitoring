@@ -12,8 +12,8 @@ This application relies on a configuration structure stored on the configured ta
 
 | Column Name         | description                                                                                                                                                        | required |
 |---------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|
-| PartitionKey        | string. name of the app being monitored                                                                                                                            | yes      |
-| RowKey              | string. name of the api being monitored                                                                                                                            | yes      |
+| PartitionKey        | string. name of the app and api being monitored, expressed using the format <app_name>-<api_name>                                                                  | yes      |
+| RowKey              | string. type of the api being monitored. same as `type`                                                                                                             | yes      |
 | url                 | string. url to be monitored                                                                                                                                        | yes      |
 | method              | string, upper case. method to be used when invoking `url`                                                                                                          | yes      |
 | body                | json stringifyied. body of the to be provided during the request. Allowed only when `method` is `PATCH`, `POST`, `DELETE`, `PUT`                                   | no       |

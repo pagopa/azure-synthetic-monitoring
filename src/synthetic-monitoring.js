@@ -74,10 +74,12 @@ async function main() {
     for await (const tableConfiguration of tableEntities) {
     try{
             //property names remap and parsing
+            let nameSplit = tableConfiguration.partitionKey.split("-")
             let monitoringConfiguration = {
                 ...tableConfiguration,
-                appName: tableConfiguration.partitionKey,
-                apiName: tableConfiguration.rowKey,
+                appName: nameSplit[0],
+                apiName: nameSplit[1],
+                type: tableConfiguration.type,
                 tags: !statics.isNull(tableConfiguration['tags']) ? JSON.parse(tableConfiguration['tags']) : {},
                 body: !statics.isNull(tableConfiguration['body']) ? JSON.parse(tableConfiguration['body']) : null,
                 headers: !statics.isNull(tableConfiguration['headers'])? JSON.parse(tableConfiguration['headers']) : null,
