@@ -24,6 +24,7 @@ function trackSelfAvailabilityEvent(toTrack, startTime, telemetryClient, result)
         message: result
     }
     telemetryClient.trackAvailability(event)
+    console.log("selfAvailabilityEvent sent")
 }
 
 
@@ -47,7 +48,7 @@ function eventSender(client){
 
         console.log(`event for ${metricContext.testId}: ${JSON.stringify(metricContext.baseEventData)}`)
         client.trackEvent(metricContext.baseEventData);
-
+        console.log("event sent")
         return metricContext;
     }
 }
@@ -72,7 +73,7 @@ function telemetrySender(client){
             console.log(`tracking cert telemetry for ${metricContext.testId}: ${JSON.stringify(certTelemetryData)}`)
             client.trackAvailability(certTelemetryData);
         }
-
+        console.log("telemetry sent")
         return metricContext
     }
 }
