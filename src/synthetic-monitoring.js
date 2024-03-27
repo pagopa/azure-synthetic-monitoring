@@ -143,4 +143,4 @@ async function testIt(monitoringConfiguration, telemetryClient, sslClient, httpC
 }
 
 //start process
-main()
+await main()
