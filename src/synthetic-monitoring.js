@@ -8,6 +8,7 @@ const { TableClient, AzureNamedKeyCredential } = require("@azure/data-tables");
 const utils = require('./utils')
 const statics = require('./statics')
 const constants = require('./const')
+const process = require('process')
 
 //env vars
 const account = process.env.STORAGE_ACCOUNT_NAME;
@@ -106,8 +107,8 @@ async function main() {
     }
 
     Promise.all(tests)
-                 .then((result) => {console.log("SUCCESS"); utils.trackSelfAvailabilityEvent(successMonitoringEvent, startTime, client, "ok");})
-                 .catch((error) => {console.error(`FAILURE: ${error}`); utils.trackSelfAvailabilityEvent(failedMonitoringEvent, startTime, client, error);})
+                 .then((result) => {utils.trackSelfAvailabilityEvent(successMonitoringEvent, startTime, client, "ok"); console.log("SUCCESS"); process.exit(0)})
+                 .catch((error) => {utils.trackSelfAvailabilityEvent(failedMonitoringEvent, startTime, client, error); console.error(`FAILURE: ${error}`); process.exit(1)})
 };
 
 
