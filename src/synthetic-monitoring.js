@@ -106,7 +106,7 @@ async function main() {
         }
     }
 
-    Promise.all(tests)
+    await Promise.all(tests)
                  .then((result) => {utils.trackSelfAvailabilityEvent(successMonitoringEvent, startTime, client, "ok"); console.log("SUCCESS")})
                  .catch((error) => {utils.trackSelfAvailabilityEvent(failedMonitoringEvent, startTime, client, error); console.error(`FAILURE: ${error}`)})
 };
@@ -143,4 +143,4 @@ async function testIt(monitoringConfiguration, telemetryClient, sslClient, httpC
 }
 
 //start process
-await main()
+main()
