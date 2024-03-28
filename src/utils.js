@@ -83,18 +83,18 @@ function telemetrySender(client){
  * @param {*} sslClient
  * @returns an async function that receives and returns the metric context
  */
-function certChecker(sslClient){
+function certChecker(httpClient){
     return async function checkCert(metricContext){
         console.log(`checking certificate for ${metricContext.testId}? ${metricContext.monitoringConfiguration.checkCertificate}`)
         let url = new URL(metricContext.monitoringConfiguration.url)
 
         metricContext.certMetrics = {
             domain: url.host,
-            checkCert: metricContext.monitoringConfiguration.checkCertificate
+            checkCert: metricContext.monitoringConfiguration.checkCertificate == 'true'
         }
 
         if (metricContext.monitoringConfiguration.checkCertificate == 'true'){
-            return sslClient.get(url.host, 20)
+            return httpClient(statics.buildCertRequest(metricContext.monitoringConfiguration))
                 .then(statics.certResponseElaborator(metricContext))
                 .catch(statics.certErrorElaborator(metricContext))
         } else {
@@ -117,5 +117,3 @@ async function checkApi(metricContext, httpClient){
         .then(statics.apiResponseElaborator(metricContext))
         .catch(statics.apiErrorElaborator(metricContext))
 }
-
-

@@ -12,9 +12,18 @@ module.exports = {
     apiErrorElaborator,
     extractTlsVersion,
     buildRequest,
+    buildCertRequest,
     initMetricObjects,
     isStatusCodeAccepted
 }
+
+function isEmpty(object) {
+    for (var prop in object) {
+      if (object.hasOwnProperty(prop)) return false;
+    }
+  
+    return true;
+  }
 
 /**
  * checks if the given data is null or is the string "null"
@@ -52,15 +61,28 @@ function enrichData(baseData, checkResult, keyList){
  */
 function certResponseElaborator(metricContext){
     return async function(certResponse){
-        const millisBeforeExpiration = metricContext.monitoringConfiguration.certValidityRangeDays * 24 * 60 * 60 * 1000
-        console.log(`cert response for ${metricContext.testId}: valid to ${certResponse.valid_to}`)
-        let validTo = new Date(certResponse.valid_to);
-        const millisToExpiration = validTo - Date.now();
-        metricContext.certMetrics['success'] = millisToExpiration > millisBeforeExpiration;
-        metricContext.certMetrics['certSuccess'] = millisToExpiration > millisBeforeExpiration ? 1 : 0
-        metricContext.certMetrics['targetExpireInDays'] = Math.floor(millisToExpiration / 86400000); //convert in days
-        metricContext.certMetrics['targetExpirationTimestamp'] = validTo.getTime();
-        metricContext.certMetrics['runLocation'] = `${metricContext.monitoringConfiguration.type}-cert`
+
+        let certificate = certResponse.request.res.socket.getPeerCertificate(false);
+
+        if (isEmpty(certificate) || certificate === null) {
+            reject({ message: 'The website did not provide a certificate' });
+
+            metricContext.certMetrics['success'] = false
+            metricContext.certMetrics['certSuccess'] = 0
+
+          } else {
+            const millisBeforeExpiration = metricContext.monitoringConfiguration.certValidityRangeDays * 24 * 60 * 60 * 1000
+            console.log(`cert response for ${metricContext.testId}: valid to ${certificate.valid_to}`)
+            let validTo = new Date(certificate.valid_to);
+            const millisToExpiration = validTo - Date.now();
+            metricContext.certMetrics['success'] = millisToExpiration > millisBeforeExpiration;
+            metricContext.certMetrics['certSuccess'] = millisToExpiration > millisBeforeExpiration ? 1 : 0
+            metricContext.certMetrics['targetExpireInDays'] = Math.floor(millisToExpiration / 86400000); //convert in days
+            metricContext.certMetrics['targetExpirationTimestamp'] = validTo.getTime();
+            metricContext.certMetrics['runLocation'] = `${metricContext.monitoringConfiguration.type}-cert`
+          }
+
+        
 
         return metricContext
     }
@@ -198,6 +220,22 @@ function buildRequest(monitoringConfiguration){
     return request;
 }
 
+
+function buildCertRequest(monitoringConfiguration){
+    let url = new URL(metricContext.monitoringConfiguration.url)
+    let request = {
+            method: 'get',
+            url: url.host,
+            validateStatus: function (status) {
+                return true; //every status code should be treated as a valid code (it will be checked later)
+            },
+            timeout: monitoringConfiguration.httpClientTimeout,
+            signal: AbortSignal.timeout(monitoringConfiguration.httpConnectionTimeout)
+    }
+
+    return request;
+}
+
 /**
  * creates the basic metric objects used to track availability and events in app insight
  * @param {monitoringConfiguration} monitoringConfiguration
@@ -261,3 +299,5 @@ function isStatusCodeAccepted(statusCode, acceptedCodes){
     })
     return accepted;
 }
+
+
