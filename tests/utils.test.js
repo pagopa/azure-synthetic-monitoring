@@ -51,14 +51,15 @@ beforeEach(() => {
             "appName": "microservice",
             "url": "https://myhost.com/path",
             "type": "private",
-            "checkCertificate": true,
+            "checkCertificate": 'true',
             "method": "GET",
             "expectedCodes": ["200-299", "303"],
             "tags": {
                 "description": "AKS ingress tested from internal network"
             },
             "durationLimit": 10000,
-            "certValidityRangeDays": "7"
+            "certValidityRangeDays": "7",
+            "httpConnectionTimeout": 2000
         },
         apiMetrics: {},
         certMetrics: {}
@@ -272,7 +273,7 @@ describe('certChecker tests', () => {
             resolve({valid_to: new Date()})
         }))
 
-        dummyMetricContex.monitoringConfiguration.checkCertificate = true
+        dummyMetricContex.monitoringConfiguration.checkCertificate = 'true'
 
 
         return utils.certChecker(dummySslClient)(dummyMetricContex).then(data =>{
@@ -281,7 +282,7 @@ describe('certChecker tests', () => {
     });
 
     test('ssl client not called if checkCert is false', () => {
-        dummyMetricContex.monitoringConfiguration.checkCertificate = false
+        dummyMetricContex.monitoringConfiguration.checkCertificate = 'false'
 
         return utils.certChecker(dummySslClient)(dummyMetricContex).then(data =>{
             expect(sslClientGet).toHaveBeenCalledTimes(0)
@@ -293,13 +294,13 @@ describe('certChecker tests', () => {
             resolve({valid_to: new Date()})
         }))
 
-        dummyMetricContex.monitoringConfiguration.checkCertificate = false
+        dummyMetricContex.monitoringConfiguration.checkCertificate = 'false'
 
         let expected = {
             ...dummyMetricContex
         }
         expected.certMetrics.domain = "myhost.com"
-        expected.certMetrics.checkCert = dummyMetricContex.monitoringConfiguration.checkCertificate
+        expected.certMetrics.checkCert = false
 
         return utils.certChecker(dummySslClient)(dummyMetricContex).then(data =>{
             expect(data).toMatchObject(expected)
@@ -312,7 +313,7 @@ describe('certChecker tests', () => {
             resolve({valid_to: expirationDate})
         }))
 
-        dummyMetricContex.monitoringConfiguration.checkCertificate = true
+        dummyMetricContex.monitoringConfiguration.checkCertificate = 'true'
 
         let expected = {
             ...dummyMetricContex
@@ -339,7 +340,7 @@ describe('certChecker tests', () => {
         let myMetricContext = {
             ...dummyMetricContex
         }
-        myMetricContext.monitoringConfiguration.checkCertificate = true
+        myMetricContext.monitoringConfiguration.checkCertificate = 'true'
 
         let expected = {
             ...myMetricContext

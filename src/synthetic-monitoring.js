@@ -16,6 +16,7 @@ const accountKey = process.env.STORAGE_ACCOUNT_KEY;
 const tableName = process.env.STORAGE_ACCOUNT_TABLE_NAME
 const availabilityPrefix = process.env.AVAILABILITY_PREFIX
 const httpClientTimeout = process.env.HTTP_CLIENT_TIMEOUT
+const httpConnectionTimeout = process.env.HTTP_CONNECTION_TIMEOUT
 const location = process.env.LOCATION
 const certValidityRangeDays = process.env.CERT_VALIDITY_RANGE_DAYS
 
@@ -89,6 +90,7 @@ async function main() {
                 expectedBody: !statics.isNull(tableConfiguration['expectedBody']) ? JSON.parse(tableConfiguration['expectedBody']) : null,
                 durationLimit: tableConfiguration.durationLimit,
                 httpClientTimeout,
+                httpConnectionTimeout,
                 availabilityPrefix,
                 certValidityRangeDays
             }

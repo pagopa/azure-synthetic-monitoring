@@ -13,13 +13,13 @@ This application relies on a configuration structure stored on the configured ta
 | Column Name         | description                                                                                                                                                        | required |
 |---------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|
 | PartitionKey        | string. name of the app and api being monitored, expressed using the format <app_name>-<api_name>                                                                  | yes      |
-| RowKey              | string. type of the api being monitored. same as `type`                                                                                                             | yes      |
+| RowKey              | string. type of the api being monitored. same as `type`                                                                                                            | yes      |
 | url                 | string. url to be monitored                                                                                                                                        | yes      |
 | method              | string, upper case. method to be used when invoking `url`                                                                                                          | yes      |
 | body                | json stringifyied. body of the to be provided during the request. Allowed only when `method` is `PATCH`, `POST`, `DELETE`, `PUT`                                   | no       |
 | expectedCodes       | json stringifyied string. list of string and ranges (eg "200-220") of accepted http status (considered a success for the availability metric)                      | yes      |
 | type                | string. identified of the api type being called. suggested types: `private`, `public`                                                                              | yes      |
-| checkCertificate    | boolean. if true, also checks the server's certificate (expiration, version)                                                                                       | yes      |
+| checkCertificate    | boolean string. if true, also checks the server's certificate (expiration, version)                                                                                | yes      |
 | durationLimit       | number. threshold, in milliseconds, over which a response time will trigger a failed availability test. to not be confused with `HTTP_CLIENT_TIMEOUT` env variable | yes      |
 | tags                | json stringifyied. dictionary of tags to be added to the tracked metrics                                                                                           | yes      |
 | headers             | json stringifyied. dictionary of headers to be sent in the http request                                                                                            | no       |
@@ -83,7 +83,8 @@ When checking the certificate, the suffix `-cert` will be appended to the "runLo
 | STORAGE_ACCOUNT_KEY           | storage account access key                                                                            | yes      | -         |
 | STORAGE_ACCOUNT_TABLE_NAME    | table name used to store the monitoring configuration                                                 | yes      | -         |
 | AVAILABILITY_PREFIX           | prefix used in the custom metric and events names                                                     | no       | synthetic |
-| HTTP_CLIENT_TIMEOUT           | timeout used by the http client performing the availability requests                                  | yes      | -         |
+| HTTP_CLIENT_TIMEOUT           | response timeout used by the http client performing the availability requests                         | yes      | -         |
+| HTTP_CONNECTION_TIMEOUT       | connection timeout used by the http client performing the availability requests                       | yes      | -         |
 | LOCATION                      | region name where this job is run                                                                     | yes      | -         |
 | CERT_VALIDITY_RANGE_DAYS      | number of days before the expiration date of a certificate over which the check is considered success | yes      | -         |
 

@@ -29,7 +29,8 @@ beforeEach(() => {
       },
       "durationLimit": 1000,
       "availabilityPrefix": "synthetic",
-      "certValidityRangeDays": 7
+      "certValidityRangeDays": 7,
+      "httpConnectionTimeout": 2000
   },
   apiMetrics: {},
   certMetrics: {}
@@ -369,7 +370,8 @@ describe('buildRequest tests', () => {
           "description": "AKS ingress tested from internal network"
       },
       "durationLimit": 1000,
-      "httpClientTimeout": 1000
+      "httpClientTimeout": 1000,
+      "httpConnectionTimeout": 2000
     }
     let expected = {
       method: "get",
@@ -394,7 +396,8 @@ describe('buildRequest tests', () => {
       },
       "body": "something",
       "durationLimit": 1000,
-      "httpClientTimeout": 1000
+      "httpClientTimeout": 1000,
+      "httpConnectionTimeout": 2000
     }
     let expected = {
       method: "get",
@@ -424,7 +427,8 @@ describe('buildRequest tests', () => {
       },
       "body": "something",
       "durationLimit": 1000,
-      "httpClientTimeout": 1000
+      "httpClientTimeout": 1000,
+      "httpConnectionTimeout": 2000
     }
     let expected = {
       method: "get",
@@ -454,7 +458,8 @@ describe('buildRequest tests', () => {
       },
       "body": "something",
       "durationLimit": 1000,
-      "httpClientTimeout": 1000
+      "httpClientTimeout": 1000,
+      "httpConnectionTimeout": 2000
     }
     let expected = {
       method: "put",
