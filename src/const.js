@@ -1,6 +1,6 @@
 const keysForTelemetry = ['success', 'message', 'duration', 'runLocation'];
 const keysForEvent = ['duration', 'targetStatus', 'targetExpirationTimestamp', 'httpStatus', 'targetTlsVersion', 'targetExpireInDays', 'certSuccess'] ;
-const keysForEventProperties = ['domain', 'checkCert'];
+const keysForEventProperties = ['domain', 'checkCert', 'message'];
 const TLS_VERSION_KEY = "TLS_VERSION"
 const START_TIMESTAMP_KEY = "x-request-timestamp"
 const RESPONSE_TIME_KEY = "RESPONSE_TIME"
