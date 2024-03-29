@@ -225,7 +225,7 @@ function buildCertRequest(monitoringConfiguration){
     let url = new URL(monitoringConfiguration.url)
     let request = {
             method: 'get',
-            url: url.host,
+            url: monitoringConfiguration.url,
             validateStatus: function (status) {
                 return true; //every status code should be treated as a valid code (it will be checked later)
             },
