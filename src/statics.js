@@ -21,7 +21,7 @@ function isEmpty(object) {
     for (var prop in object) {
       if (object.hasOwnProperty(prop)) return false;
     }
-  
+
     return true;
   }
 
@@ -82,7 +82,7 @@ function certResponseElaborator(metricContext){
             metricContext.certMetrics['runLocation'] = `${metricContext.monitoringConfiguration.type}-cert`
           }
 
-        
+
 
         return metricContext
     }
@@ -206,7 +206,7 @@ function buildRequest(monitoringConfiguration){
                 return true; //every status code should be treated as a valid code (it will be checked later)
             },
             timeout: monitoringConfiguration.httpClientTimeout,
-            signal: AbortSignal.timeout(monitoringConfiguration.httpConnectionTimeout)
+            signal: AbortSignal.timeout(2000)
     }
 
     if (monitoringConfiguration.headers) {
@@ -230,7 +230,7 @@ function buildCertRequest(monitoringConfiguration){
                 return true; //every status code should be treated as a valid code (it will be checked later)
             },
             timeout: monitoringConfiguration.httpClientTimeout,
-            signal: AbortSignal.timeout(monitoringConfiguration.httpConnectionTimeout)
+            signal: AbortSignal.timeout(2000)
     }
 
     return request;
