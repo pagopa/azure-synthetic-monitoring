@@ -138,7 +138,7 @@ async function testIt(monitoringConfiguration, telemetryClient, sslClient, httpC
   }
 
   return utils.checkApi(metricContex, httpClient)
-  .then(utils.certChecker(sslClient))
+  .then(utils.certChecker(httpClient))
   .then(utils.telemetrySender(telemetryClient))
   .then(utils.eventSender(telemetryClient))
 
