@@ -138,6 +138,13 @@ async function testIt(monitoringConfiguration, telemetryClient, sslClient, httpC
       certMetrics: null
   }
 
+  let url = new URL(metricContex.monitoringConfiguration.url)
+
+  metricContex.certMetrics = {
+      domain: url.host,
+      checkCert: metricContex.monitoringConfiguration.checkCertificate
+  }
+
   return utils.checkApi(metricContex, httpClient)
   //.then(utils.certChecker(sslClient))
   .then(utils.telemetrySender(telemetryClient))
