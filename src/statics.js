@@ -66,7 +66,7 @@ function certResponseElaborator(metricContext){
 
         if (isEmpty(certificate) || certificate === null) {
             console.log(`cert error for ${metricContext.testId}: The website did not provide a certificate`)
-            reject({ message: 'The website did not provide a certificate' });
+            //reject({ message: 'The website did not provide a certificate' });
 
             metricContext.certMetrics['success'] = false
             metricContext.certMetrics['certSuccess'] = 0
@@ -225,7 +225,7 @@ function buildRequest(monitoringConfiguration){
 function buildCertRequest(monitoringConfiguration){
     let url = new URL(monitoringConfiguration.url)
     let request = {
-            method: monitoringConfiguration.method.toLowerCase(),
+            method: 'get',
             url: monitoringConfiguration.url,
             validateStatus: function (status) {
                 return true; //every status code should be treated as a valid code (it will be checked later)
