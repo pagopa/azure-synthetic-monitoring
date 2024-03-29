@@ -222,7 +222,7 @@ function buildRequest(monitoringConfiguration){
 
 
 function buildCertRequest(monitoringConfiguration){
-    let url = new URL(metricContext.monitoringConfiguration.url)
+    let url = new URL(monitoringConfiguration.url)
     let request = {
             method: 'get',
             url: url.host,
