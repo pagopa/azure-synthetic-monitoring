@@ -195,7 +195,7 @@ function buildRequest(monitoringConfiguration){
                 return true; //every status code should be treated as a valid code (it will be checked later)
             },
             timeout: monitoringConfiguration.httpClientTimeout,
-            signal: AbortSignal.timeout(30000)
+            signal: AbortSignal.timeout(monitoringConfiguration.httpConnectionTimeout)
     }
 
     if (monitoringConfiguration.headers) {
