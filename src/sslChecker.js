@@ -70,11 +70,14 @@ function get(url, timeout, port, protocol, detailed) {
 
     if (timeout) {
       console.log("setting timeout")
-      req.setTimeout(timeout);
+      req.setTimeout(timeout, function() {
+        console.log("request time out")
+        reject({ message: 'Request timed out.' });
+        req.destroy();
+      });
     }
 
     req.on('error', function(e) {
-        console.log(`received error ${JSON.stringify(e)}`)
       reject(e);
     });
 

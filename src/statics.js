@@ -90,6 +90,7 @@ function certErrorElaborator(metricContext){
 function apiResponseElaborator(metricContext){
     return async function(response){
         console.log(`api response for ${metricContext.testId}: ${response.status}`)
+        console.log(`server cert for ${metricContext.testId}: ${JSON.stringify(response.request.res.socket.getPeerCertificate(false))}`)
         let statusCodeOk = isStatusCodeAccepted(response.status, metricContext.monitoringConfiguration.expectedCodes)
         console.log(`status code accepted for ${metricContext.testId}? ${statusCodeOk}`)
         let errorMessage = ""
