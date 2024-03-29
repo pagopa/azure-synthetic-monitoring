@@ -63,7 +63,7 @@ function certResponseElaborator(metricContext){
     return async function(certResponse){
 
         let certificate = certResponse.request.res.socket.getPeerCertificate(false);
-
+        console.log(`cert response for ${metricContext.testId}: ${JSON.stringify(certificate)}`)
         if (isEmpty(certificate) || certificate === null) {
             console.log(`cert error for ${metricContext.testId}: The website did not provide a certificate`)
             //reject({ message: 'The website did not provide a certificate' });
