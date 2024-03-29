@@ -95,7 +95,7 @@ function certChecker(sslClient){
         }
 
         if (metricContext.monitoringConfiguration.checkCertificate == 'true'){
-            return sslClient.get(url.host, 20)
+            return sslClient.get(url.host, 2000)
                 .then(statics.certResponseElaborator(metricContext))
                 .catch(statics.certErrorElaborator(metricContext))
         } else {
