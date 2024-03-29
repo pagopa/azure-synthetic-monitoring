@@ -1,7 +1,8 @@
 //dependencies
 const appInsights = require("applicationinsights");
 const axios = require('axios');
-const sslClient = require('get-ssl-certificate')
+//const sslClient = require('get-ssl-certificate')
+const sslClient = require('./sslChecker')
 const { TableClient, AzureNamedKeyCredential } = require("@azure/data-tables");
 
 // modules
