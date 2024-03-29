@@ -5,7 +5,6 @@ const statics = require('./statics')
 
 module.exports = {
     trackSelfAvailabilityEvent,
-    certChecker,
     eventSender,
     telemetrySender,
     checkApi
@@ -79,30 +78,7 @@ function telemetrySender(client){
     }
 }
 
-/**
- * executes the ssl check required by the monitoring configuration
- * @param {*} sslClient
- * @returns an async function that receives and returns the metric context
- */
-function certChecker(sslClient){
-    return async function checkCert(metricContext){
-        console.log(`checking certificate for ${metricContext.testId}? ${metricContext.monitoringConfiguration.checkCertificate}`)
-        let url = new URL(metricContext.monitoringConfiguration.url)
 
-        metricContext.certMetrics = {
-            domain: url.host,
-            checkCert: metricContext.monitoringConfiguration.checkCertificate
-        }
-
-        if (metricContext.monitoringConfiguration.checkCertificate == 'true'){
-            return sslClient.get(url.host, 200)
-                .then(statics.certResponseElaborator(metricContext))
-                .catch(statics.certErrorElaborator(metricContext))
-        } else {
-            return metricContext
-        }
-    }
-}
 
 /**
  * calls the configured api and checks the response, populating the metric context accordingly

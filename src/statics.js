@@ -6,8 +6,8 @@ const comparator = require('./comparator')
 module.exports = {
     isNull,
     enrichData,
-    certResponseElaborator,
-    certErrorElaborator,
+    readCert,
+    readCertError,
     apiResponseElaborator,
     apiErrorElaborator,
     extractTlsVersion,
@@ -45,27 +45,14 @@ function enrichData(baseData, checkResult, keyList){
 }
 
 
+
+
 /**
  * parses the certificate response and populates the related metrics in the metric context
  * @param {metricContext} metricContext
- * @returns an async function that receives the certResponse and returns the enriched metric context
+ * @param {certResponse} certResponse
+ * @returns receives the certResponse and returns the enriched metric context
  */
-function certResponseElaborator(metricContext){
-    return async function(certResponse){
-        const millisBeforeExpiration = metricContext.monitoringConfiguration.certValidityRangeDays * 24 * 60 * 60 * 1000
-        console.log(`cert response for ${metricContext.testId}: valid to ${certResponse.valid_to}`)
-        let validTo = new Date(certResponse.valid_to);
-        const millisToExpiration = validTo - Date.now();
-        metricContext.certMetrics['success'] = millisToExpiration > millisBeforeExpiration;
-        metricContext.certMetrics['certSuccess'] = millisToExpiration > millisBeforeExpiration ? 1 : 0
-        metricContext.certMetrics['targetExpireInDays'] = Math.floor(millisToExpiration / 86400000); //convert in days
-        metricContext.certMetrics['targetExpirationTimestamp'] = validTo.getTime();
-        metricContext.certMetrics['runLocation'] = `${metricContext.monitoringConfiguration.type}-cert`
-
-        return metricContext
-    }
-}
-
 function readCert(metricContext, certResponse){
         const millisBeforeExpiration = metricContext.monitoringConfiguration.certValidityRangeDays * 24 * 60 * 60 * 1000
         console.log(`cert response for ${metricContext.testId}: valid to ${certResponse.valid_to}`)
@@ -76,26 +63,16 @@ function readCert(metricContext, certResponse){
         metricContext.certMetrics['targetExpireInDays'] = Math.floor(millisToExpiration / 86400000); //convert in days
         metricContext.certMetrics['targetExpirationTimestamp'] = validTo.getTime();
         metricContext.certMetrics['runLocation'] = `${metricContext.monitoringConfiguration.type}-cert`
-
         return metricContext
     }
+
 
 /**
  * parses the error received from the certificate request and populates the related metric
  * @param {metricContext} metricContext
+ * @param {error} error
  * @returns an async function that receives an error and returns the enriched metric context
  */
-function certErrorElaborator(metricContext){
-    return async function(error){
-        console.log(`cert error for ${metricContext.testId}: ${JSON.stringify(error)}`)
-        metricContext.certMetrics['message'] = error.message
-        metricContext.certMetrics['runLocation'] = `${metricContext.monitoringConfiguration.type}-cert`
-        metricContext.certMetrics['success'] = false
-
-        return metricContext
-    }
-}
-
 function readCertError(metricContext, error){
         console.log(`cert error for ${metricContext.testId}: ${JSON.stringify(error)}`)
         metricContext.certMetrics['message'] = error.message
@@ -114,12 +91,11 @@ function apiResponseElaborator(metricContext){
     return async function(response){
         console.log(`api response for ${metricContext.testId}: ${response.status}`)
 
-        let serverCert = response.request.res.socket.getPeerCertificate(false);
         if (metricContext.monitoringConfiguration.checkCertificate == 'true'){
-            console.log(`checking cert for${metricContext.testId}`)
-            metricContext = readCert(metricContext, serverCert) 
-        } 
-
+            let serverCert = response.request.res.socket.getPeerCertificate(false);
+            console.log(`checking cert for ${metricContext.testId}`)
+            metricContext = readCert(metricContext, serverCert)
+        }
         let statusCodeOk = isStatusCodeAccepted(response.status, metricContext.monitoringConfiguration.expectedCodes)
         console.log(`status code accepted for ${metricContext.testId}? ${statusCodeOk}`)
         let errorMessage = ""
@@ -172,8 +148,8 @@ function apiErrorElaborator(metricContext){
 
         if (metricContext.monitoringConfiguration.checkCertificate == 'true'){
             console.log(`cert error for${metricContext.testId}`)
-            metricContext = readCertError(metricContext, error) 
-        }     
+            metricContext = readCertError(metricContext, error)
+        }
 
         let apiMetrics = {
           message:  error.message,

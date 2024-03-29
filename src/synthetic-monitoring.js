@@ -1,8 +1,6 @@
 //dependencies
 const appInsights = require("applicationinsights");
 const axios = require('axios');
-//const sslClient = require('get-ssl-certificate')
-const sslClient = require('./sslChecker')
 const { TableClient, AzureNamedKeyCredential } = require("@azure/data-tables");
 
 // modules
@@ -97,7 +95,7 @@ async function main() {
             }
             console.log(`monitoringConfiguration: ${JSON.stringify(monitoringConfiguration)}`)
 
-            tests.push(testIt(monitoringConfiguration, client, sslClient, axios).catch((error) => {
+            tests.push(testIt(monitoringConfiguration, client, axios).catch((error) => {
                 console.error(`error in test for ${JSON.stringify(monitoringConfiguration)}: ${JSON.stringify(error.message)}`)
             }));
 
@@ -124,7 +122,7 @@ async function main() {
  * @param {axios} httpClient axios client
  * @returns promise rejected in case of a test EXECUTION failure
  */
-async function testIt(monitoringConfiguration, telemetryClient, sslClient, httpClient){
+async function testIt(monitoringConfiguration, telemetryClient, httpClient){
   console.log(`preparing test for ${JSON.stringify(monitoringConfiguration)}`)
 
   let metricObjects =  statics.initMetricObjects(monitoringConfiguration);
@@ -146,7 +144,6 @@ async function testIt(monitoringConfiguration, telemetryClient, sslClient, httpC
   }
 
   return utils.checkApi(metricContex, httpClient)
-  //.then(utils.certChecker(sslClient))
   .then(utils.telemetrySender(telemetryClient))
   .then(utils.eventSender(telemetryClient))
 
