@@ -74,7 +74,7 @@ function get(url, timeout, port, protocol, detailed) {
     }
 
     req.on('error', function(e) {
-        console.log("received error")
+        console.log(`received error ${JSON.stringify(e)`)
       reject(e);
     });
 
