@@ -2,9 +2,9 @@ const constants = require('./const')
 const statics = require('./statics')
 
 
+
 module.exports = {
     trackSelfAvailabilityEvent,
-    certChecker,
     eventSender,
     telemetrySender,
     checkApi
@@ -24,6 +24,7 @@ function trackSelfAvailabilityEvent(toTrack, startTime, telemetryClient, result)
         message: result
     }
     telemetryClient.trackAvailability(event)
+    console.log("selfAvailabilityEvent sent")
 }
 
 
@@ -47,7 +48,7 @@ function eventSender(client){
 
         console.log(`event for ${metricContext.testId}: ${JSON.stringify(metricContext.baseEventData)}`)
         client.trackEvent(metricContext.baseEventData);
-
+        console.log("event sent")
         return metricContext;
     }
 }
@@ -72,35 +73,12 @@ function telemetrySender(client){
             console.log(`tracking cert telemetry for ${metricContext.testId}: ${JSON.stringify(certTelemetryData)}`)
             client.trackAvailability(certTelemetryData);
         }
-
+        console.log("telemetry sent")
         return metricContext
     }
 }
 
-/**
- * executes the ssl check required by the monitoring configuration
- * @param {*} sslClient
- * @returns an async function that receives and returns the metric context
- */
-function certChecker(sslClient){
-    return async function checkCert(metricContext){
-        console.log(`checking certificate for ${metricContext.testId}? ${metricContext.monitoringConfiguration.checkCertificate}`)
-        let url = new URL(metricContext.monitoringConfiguration.url)
 
-        metricContext.certMetrics = {
-            domain: url.host,
-            checkCert: metricContext.monitoringConfiguration.checkCertificate
-        }
-
-        if (metricContext.monitoringConfiguration.checkCertificate){
-            return sslClient.get(url.host)
-                .then(statics.certResponseElaborator(metricContext))
-                .catch(statics.certErrorElaborator(metricContext))
-        } else {
-            return metricContext
-        }
-    }
-}
 
 /**
  * calls the configured api and checks the response, populating the metric context accordingly

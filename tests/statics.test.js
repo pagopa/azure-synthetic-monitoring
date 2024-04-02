@@ -123,10 +123,8 @@ describe('certResponseElaborator tests', () => {
       runLocation: `${dummyMetricContex.monitoringConfiguration.type}-cert`
     }
 
+    expect(statics.readCert(dummyMetricContex, mockCertResponse)).toMatchObject({ certMetrics: expectedCertMetric});
 
-    return statics.certResponseElaborator(dummyMetricContex)(mockCertResponse).then(data =>{
-      expect(data).toMatchObject({ certMetrics: expectedCertMetric});
-    })
 
   });
 
@@ -143,10 +141,8 @@ describe('certResponseElaborator tests', () => {
       runLocation: `${dummyMetricContex.monitoringConfiguration.type}-cert`
     }
 
+    expect(statics.readCert(dummyMetricContex, mockCertResponse)).toMatchObject({ certMetrics: expectedCertMetric});
 
-    return statics.certResponseElaborator(dummyMetricContex)(mockCertResponse).then(data =>{
-      expect(data).toMatchObject({ certMetrics: expectedCertMetric});
-    })
 
   });
 })
@@ -163,10 +159,7 @@ describe('certErrorElaborator tests', () => {
       runLocation: `${dummyMetricContex.monitoringConfiguration.type}-cert`
     }
 
-
-    return statics.certErrorElaborator(dummyMetricContex)({"message": "foo"}).then(data =>{
-      expect(data).toMatchObject({ certMetrics: expectedCertMetric});
-    })
+    expect(statics.readCertError(dummyMetricContex, {"message": "foo"})).toMatchObject({ certMetrics: expectedCertMetric});
 
   });
 })

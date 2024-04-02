@@ -1,13 +1,13 @@
 //dependencies
 const appInsights = require("applicationinsights");
 const axios = require('axios');
-const sslClient = require('get-ssl-certificate')
 const { TableClient, AzureNamedKeyCredential } = require("@azure/data-tables");
 
 // modules
 const utils = require('./utils')
 const statics = require('./statics')
 const constants = require('./const')
+const process = require('process')
 
 //env vars
 const account = process.env.STORAGE_ACCOUNT_NAME;
@@ -93,7 +93,7 @@ async function main() {
             }
             console.log(`monitoringConfiguration: ${JSON.stringify(monitoringConfiguration)}`)
 
-            tests.push(testIt(monitoringConfiguration, client, sslClient, axios).catch((error) => {
+            tests.push(testIt(monitoringConfiguration, client, axios).catch((error) => {
                 console.error(`error in test for ${JSON.stringify(monitoringConfiguration)}: ${JSON.stringify(error.message)}`)
             }));
 
@@ -105,9 +105,9 @@ async function main() {
         }
     }
 
-    Promise.all(tests)
-                 .then((result) => {console.log("SUCCESS"); utils.trackSelfAvailabilityEvent(successMonitoringEvent, startTime, client, "ok");})
-                 .catch((error) => {console.error(`FAILURE: ${error}`); utils.trackSelfAvailabilityEvent(failedMonitoringEvent, startTime, client, error);})
+    await Promise.all(tests)
+                 .then((result) => {utils.trackSelfAvailabilityEvent(successMonitoringEvent, startTime, client, "ok"); console.log("SUCCESS")})
+                 .catch((error) => {utils.trackSelfAvailabilityEvent(failedMonitoringEvent, startTime, client, error); console.error(`FAILURE: ${error}`)})
 };
 
 
@@ -120,7 +120,7 @@ async function main() {
  * @param {axios} httpClient axios client
  * @returns promise rejected in case of a test EXECUTION failure
  */
-async function testIt(monitoringConfiguration, telemetryClient, sslClient, httpClient){
+async function testIt(monitoringConfiguration, telemetryClient, httpClient){
   console.log(`preparing test for ${JSON.stringify(monitoringConfiguration)}`)
 
   let metricObjects =  statics.initMetricObjects(monitoringConfiguration);
@@ -134,8 +134,14 @@ async function testIt(monitoringConfiguration, telemetryClient, sslClient, httpC
       certMetrics: null
   }
 
+  let url = new URL(metricContex.monitoringConfiguration.url)
+
+  metricContex.certMetrics = {
+      domain: url.host,
+      checkCert: metricContex.monitoringConfiguration.checkCertificate
+  }
+
   return utils.checkApi(metricContex, httpClient)
-  .then(utils.certChecker(sslClient))
   .then(utils.telemetrySender(telemetryClient))
   .then(utils.eventSender(telemetryClient))
 

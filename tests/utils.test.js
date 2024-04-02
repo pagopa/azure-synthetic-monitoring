@@ -51,7 +51,7 @@ beforeEach(() => {
             "appName": "microservice",
             "url": "https://myhost.com/path",
             "type": "private",
-            "checkCertificate": true,
+            "checkCertificate": 'true',
             "method": "GET",
             "expectedCodes": ["200-299", "303"],
             "tags": {
@@ -265,101 +265,6 @@ describe('telemetrySender tests', () => {
 
 
 
-
-describe('certChecker tests', () => {
-    test('call ssl client once if checkCert is true', () => {
-        dummySslClient.get.mockReturnValue(new Promise((resolve, reject) => {
-            resolve({valid_to: new Date()})
-        }))
-
-        dummyMetricContex.monitoringConfiguration.checkCertificate = true
-
-
-        return utils.certChecker(dummySslClient)(dummyMetricContex).then(data =>{
-            expect(sslClientGet).toHaveBeenCalledTimes(1)
-        })
-    });
-
-    test('ssl client not called if checkCert is false', () => {
-        dummyMetricContex.monitoringConfiguration.checkCertificate = false
-
-        return utils.certChecker(dummySslClient)(dummyMetricContex).then(data =>{
-            expect(sslClientGet).toHaveBeenCalledTimes(0)
-        })
-    });
-
-    test('enrich metric context with domain info when checkCertificate is false', () => {
-        dummySslClient.get.mockReturnValue(new Promise((resolve, reject) => {
-            resolve({valid_to: new Date()})
-        }))
-
-        dummyMetricContex.monitoringConfiguration.checkCertificate = false
-
-        let expected = {
-            ...dummyMetricContex
-        }
-        expected.certMetrics.domain = "myhost.com"
-        expected.certMetrics.checkCert = dummyMetricContex.monitoringConfiguration.checkCertificate
-
-        return utils.certChecker(dummySslClient)(dummyMetricContex).then(data =>{
-            expect(data).toMatchObject(expected)
-        })
-    });
-
-    test('enrich metric context with cert info when check certs is true', () => {
-        let expirationDate = datePlusDays(10)
-        dummySslClient.get.mockReturnValue(new Promise((resolve, reject) => {
-            resolve({valid_to: expirationDate})
-        }))
-
-        dummyMetricContex.monitoringConfiguration.checkCertificate = true
-
-        let expected = {
-            ...dummyMetricContex
-        }
-
-        expected.certMetrics['success'] = true;
-        expected.certMetrics['certSuccess'] = 1
-        expected.certMetrics['checkCert'] = true
-        expected.certMetrics['targetExpireInDays'] = 10
-        expected.certMetrics['targetExpirationTimestamp'] = expirationDate.getTime();
-        expected.certMetrics['runLocation'] = `${dummyMetricContex.monitoringConfiguration.type}-cert`
-        expected.certMetrics.domain = "myhost.com"
-
-        return utils.certChecker(dummySslClient)(dummyMetricContex).then(data =>{
-            expect(data).toMatchObject(expected)
-        })
-    });
-
-    test('enrich metric context with error info when check fails', () => {
-        dummySslClient.get.mockReturnValue(new Promise((resolve, reject) => {
-            reject({message: "error message"})
-        }))
-
-        let myMetricContext = {
-            ...dummyMetricContex
-        }
-        myMetricContext.monitoringConfiguration.checkCertificate = true
-
-        let expected = {
-            ...myMetricContext
-        }
-
-        expected.certMetrics['success'] = false;
-        expected.certMetrics['checkCert'] = true
-        expected.certMetrics['message'] = "error message"
-        expected.certMetrics['runLocation'] = `${dummyMetricContex.monitoringConfiguration.type}-cert`
-        expected.certMetrics.domain = "myhost.com"
-
-        return utils.certChecker(dummySslClient)(myMetricContext).then(data =>{
-            expect(data).toMatchObject(expected)
-        })
-    });
-})
-
-
-
-
 describe('checkApi tests', () => {
     test('calls http client once', () => {
         let dummyHttpResponse = {
@@ -384,7 +289,16 @@ describe('checkApi tests', () => {
             status : 200,
             RESPONSE_TIME: 1234,
             statusText: "ok",
-            TLS_VERSION: "v1.3"
+            TLS_VERSION: "v1.3",
+            request: {
+                res: {
+                    socket: {
+                        getPeerCertificate: function (booleanValue){
+                            return {valid_to: new Date()}
+                        }
+                    }
+                }
+            }
         }
 
         dummyHttpClient.mockReturnValue(new Promise((resolve, reject) => {
@@ -409,6 +323,7 @@ describe('checkApi tests', () => {
         })
     });
 
+
     test('enrich context with error data when response fails', () => {
         dummyHttpClient.mockReturnValue(new Promise((resolve, reject) => {
             reject({message: "failure message"})
@@ -421,6 +336,118 @@ describe('checkApi tests', () => {
                 message : "failure message",
                 targetStatus : 0,
             }
+        }
+
+
+        return utils.checkApi(dummyMetricContex, dummyHttpClient).then(data =>{
+            expect(data).toMatchObject(expected);
+        })
+    });
+
+    test('enrich metric context with domain info when checkCertificate is false', () => {
+         dummyHttpClient.mockReturnValue(new Promise((resolve, reject) => {
+            reject({message: "failure message"})
+          }))
+
+        let expected = {
+             ...dummyMetricContex
+        }
+        expected.certMetrics.domain = "myhost.com"
+        expected.certMetrics.checkCert = false
+
+        dummyMetricContex.monitoringConfiguration.checkCertificate = 'false'
+
+        return utils.checkApi(dummyMetricContex, dummyHttpClient).then(data =>{
+            expect(data).toMatchObject(expected);
+        })
+
+    });
+
+    test('enrich context with error cert data when response fails and checkCert true', () => {
+        dummyHttpClient.mockReturnValue(new Promise((resolve, reject) => {
+            reject({message: "failure message"})
+          }))
+
+        let expected = {
+            ...dummyMetricContex,
+            certMetrics: {
+              success:false,
+              runLocation:"private-cert"
+            },
+
+        }
+
+        return utils.checkApi(dummyMetricContex, dummyHttpClient).then(data =>{
+            expect(data).toMatchObject(expected);
+        })
+    });
+
+
+
+     test('enrich context with cert data when response ok and checkCert true', () => {
+        let dummyHttpResponse = {
+            status : 200,
+            RESPONSE_TIME: 1234,
+            statusText: "ok",
+            TLS_VERSION: "v1.3",
+            request: {
+                res: {
+                    socket: {
+                        getPeerCertificate: function (booleanValue){
+                            return {valid_to: datePlusDays(10)}
+                        }
+                    }
+                }
+            }
+        }
+
+        dummyHttpClient.mockReturnValue(new Promise((resolve, reject) => {
+            resolve(dummyHttpResponse)
+          }))
+
+        let expected = {
+            ...dummyMetricContex,
+            certMetrics: {
+              success:true,
+              certSuccess:1,
+              targetExpireInDays:10,
+              targetExpirationTimestamp:1644534000000,
+              runLocation:"private-cert"
+            },
+
+        }
+
+
+        return utils.checkApi(dummyMetricContex, dummyHttpClient).then(data =>{
+            expect(data).toMatchObject(expected);
+        })
+    });
+
+    test('not enrich context with cert data when response ok and checkCert false', () => {
+        let dummyHttpResponse = {
+            status : 200,
+            RESPONSE_TIME: 1234,
+            statusText: "ok",
+            TLS_VERSION: "v1.3",
+            request: {
+                res: {
+                    socket: {
+                        getPeerCertificate: function (booleanValue){
+                            return {valid_to: datePlusDays(10)}
+                        }
+                    }
+                }
+            }
+        }
+        dummyMetricContex.monitoringConfiguration.checkCertificate = 'false'
+        dummyHttpClient.mockReturnValue(new Promise((resolve, reject) => {
+            resolve(dummyHttpResponse)
+          }))
+
+        let expected = {
+            ...dummyMetricContex,
+            certMetrics: {},
+
         }
 
 
