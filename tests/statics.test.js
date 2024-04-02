@@ -29,8 +29,7 @@ beforeEach(() => {
       },
       "durationLimit": 1000,
       "availabilityPrefix": "synthetic",
-      "certValidityRangeDays": 7,
-      "httpConnectionTimeout": 2000
+      "certValidityRangeDays": 7
   },
   apiMetrics: {},
   certMetrics: {}
@@ -125,7 +124,7 @@ describe('certResponseElaborator tests', () => {
     }
 
     expect(statics.readCert(dummyMetricContex, mockCertResponse)).toMatchObject({ certMetrics: expectedCertMetric});
- 
+
 
   });
 
@@ -144,7 +143,7 @@ describe('certResponseElaborator tests', () => {
 
     expect(statics.readCert(dummyMetricContex, mockCertResponse)).toMatchObject({ certMetrics: expectedCertMetric});
 
-  
+
   });
 })
 
@@ -363,8 +362,7 @@ describe('buildRequest tests', () => {
           "description": "AKS ingress tested from internal network"
       },
       "durationLimit": 1000,
-      "httpClientTimeout": 1000,
-      "httpConnectionTimeout": 2000
+      "httpClientTimeout": 1000
     }
     let expected = {
       method: "get",
@@ -389,8 +387,7 @@ describe('buildRequest tests', () => {
       },
       "body": "something",
       "durationLimit": 1000,
-      "httpClientTimeout": 1000,
-      "httpConnectionTimeout": 2000
+      "httpClientTimeout": 1000
     }
     let expected = {
       method: "get",
@@ -420,8 +417,7 @@ describe('buildRequest tests', () => {
       },
       "body": "something",
       "durationLimit": 1000,
-      "httpClientTimeout": 1000,
-      "httpConnectionTimeout": 2000
+      "httpClientTimeout": 1000
     }
     let expected = {
       method: "get",
@@ -451,8 +447,7 @@ describe('buildRequest tests', () => {
       },
       "body": "something",
       "durationLimit": 1000,
-      "httpClientTimeout": 1000,
-      "httpConnectionTimeout": 2000
+      "httpClientTimeout": 1000
     }
     let expected = {
       method: "put",

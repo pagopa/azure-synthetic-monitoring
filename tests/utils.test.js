@@ -58,8 +58,7 @@ beforeEach(() => {
                 "description": "AKS ingress tested from internal network"
             },
             "durationLimit": 10000,
-            "certValidityRangeDays": "7",
-            "httpConnectionTimeout": 2000
+            "certValidityRangeDays": "7"
         },
         apiMetrics: {},
         certMetrics: {}
