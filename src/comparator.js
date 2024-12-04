@@ -133,8 +133,7 @@ const xmlContainsKeys = function (actual, expected) {
   try{
     const parser = new XMLParser();
     let actualParsed = parser.parse(actual);
-    console.log("#####")
-    console.log(actualParsed)
+    console.debug(actualParsed)
     result = this.containsKeys(actualParsed, expected);
   } catch (err) {
     console.error(`failed check: ${err}`)
