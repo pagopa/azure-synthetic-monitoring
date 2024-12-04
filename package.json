@@ -1,6 +1,6 @@
 {
   "name": "azure-synthetic-monitoring",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Azure Synthetic monitoring",
   "main": "./src/functions/synthetic-monitoring.js",
   "author": "",

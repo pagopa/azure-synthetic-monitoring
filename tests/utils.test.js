@@ -412,7 +412,7 @@ describe('checkApi tests', () => {
               success:true,
               certSuccess:1,
               targetExpireInDays:10,
-              targetExpirationTimestamp: expirationDate.getTime(),
+              targetExpirationTimestamp: 1644534000000,
               runLocation:"private-cert"
             },
 
