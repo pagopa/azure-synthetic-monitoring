@@ -1,3 +1,5 @@
+const {XMLParser} = require('fast-xml-parser');
+
 function compare(strategyName, actual, expected){
   if(strategyName in strategies){
       return strategies[strategyName](actual, expected)
@@ -6,6 +8,8 @@ function compare(strategyName, actual, expected){
     return false
   }
 }
+
+
 
 const contains = function (actual, expected) {
         let result = true;
@@ -109,11 +113,43 @@ const contains = function (actual, expected) {
         return check;
     }
 
+
+const xmlContains = function (actual, expected) {
+  let result = true;
+  try{
+    const parser = new XMLParser();
+    let actualParsed = parser.parse(actual);
+    console.log(actualParsed)
+    result = this.contains(actualParsed, expected);
+  } catch (err) {
+    console.error(`failed check: ${err}`)
+    result = false;
+  }
+  return result;
+}
+
+const xmlContainsKeys = function (actual, expected) {
+  let result = true;
+  try{
+    const parser = new XMLParser();
+    let actualParsed = parser.parse(actual);
+    console.log("#####")
+    console.log(actualParsed)
+    result = this.containsKeys(actualParsed, expected);
+  } catch (err) {
+    console.error(`failed check: ${err}`)
+    result = false;
+  }
+  return result;
+}
+
  const strategies = {
         contains,
         containsKeys,
         listOfTypes,
-        typeOf
+        typeOf,
+        xmlContains,
+        xmlContainsKeys
     }
 
 
