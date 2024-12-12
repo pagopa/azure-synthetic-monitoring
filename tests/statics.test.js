@@ -60,7 +60,7 @@ describe('isNull tests', () => {
   });
 
   test('returns true when empty string', () => {
-    expect(statics.isNull("")).toBe(false);
+    expect(statics.isNull("")).toBe(true);
   });
 
   test('returns false when int', () => {
