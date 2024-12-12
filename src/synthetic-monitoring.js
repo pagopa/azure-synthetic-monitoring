@@ -98,7 +98,7 @@ async function main() {
             }));
 
         }catch (parseError){
-            console.error(`error parsing test for ${JSON.stringify(tableConfiguration)}`)
+            console.error(`error parsing test for ${JSON.stringify(tableConfiguration)}. ${parseError.message}`)
             tests.push(new Promise((resolve, reject) => {
                 reject(parseError.message)
               }));

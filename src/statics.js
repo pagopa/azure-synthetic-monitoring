@@ -22,7 +22,7 @@ module.exports = {
  * @returns boolean
  */
 function isNull(data){
-    return data == null || data == "null" || data == undefined
+    return data == null || data == "null" || data == undefined || data == ""
 }
 
 /**

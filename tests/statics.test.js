@@ -59,6 +59,9 @@ describe('isNull tests', () => {
     expect(statics.isNull("something")).toBe(false);
   });
 
+  test('returns true when empty string', () => {
+    expect(statics.isNull("")).toBe(true);
+  });
 
   test('returns false when int', () => {
     expect(statics.isNull(5)).toBe(false);
