@@ -148,7 +148,26 @@ describe('certResponseElaborator tests', () => {
 
 
   });
+
+  test('returns false when cert is null', () => {
+    let validTo = new Date();
+    validTo.setDate(validTo.getDate() + 6);
+    let mockCertResponse = null
+    let expectedCertMetric = {
+      success : false,
+      runLocation: `${dummyMetricContex.monitoringConfiguration.type}-cert`
+    }
+  
+    expect(statics.readCert(dummyMetricContex, mockCertResponse)).toMatchObject({ certMetrics: expectedCertMetric});
+  
+  
+  });
+
 })
+
+
+
+
 
 
 describe('certErrorElaborator tests', () => {

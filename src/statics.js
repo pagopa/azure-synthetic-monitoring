@@ -54,16 +54,22 @@ function enrichData(baseData, checkResult, keyList){
  * @returns receives the certResponse and returns the enriched metric context
  */
 function readCert(metricContext, certResponse){
-        const millisBeforeExpiration = metricContext.monitoringConfiguration.certValidityRangeDays * 24 * 60 * 60 * 1000
-        console.log(`cert response for ${metricContext.testId}: valid to ${certResponse.valid_to}`)
-        let validTo = new Date(certResponse.valid_to);
-        const millisToExpiration = validTo - Date.now();
-        metricContext.certMetrics['success'] = millisToExpiration > millisBeforeExpiration;
-        metricContext.certMetrics['certSuccess'] = millisToExpiration > millisBeforeExpiration ? 1 : 0
-        metricContext.certMetrics['targetExpireInDays'] = Math.floor(millisToExpiration / 86400000); //convert in days
-        metricContext.certMetrics['targetExpirationTimestamp'] = validTo.getTime();
-        metricContext.certMetrics['runLocation'] = `${metricContext.monitoringConfiguration.type}-cert`
-        return metricContext
+        if (certResponse != null) {
+            const millisBeforeExpiration = metricContext.monitoringConfiguration.certValidityRangeDays * 24 * 60 * 60 * 1000
+            console.log(`cert response for ${metricContext.testId}: valid to ${certResponse.valid_to}`)
+            let validTo = new Date(certResponse.valid_to);
+            const millisToExpiration = validTo - Date.now();
+            metricContext.certMetrics['success'] = millisToExpiration > millisBeforeExpiration;
+            metricContext.certMetrics['certSuccess'] = millisToExpiration > millisBeforeExpiration ? 1 : 0
+            metricContext.certMetrics['targetExpireInDays'] = Math.floor(millisToExpiration / 86400000); //convert in days
+            metricContext.certMetrics['targetExpirationTimestamp'] = validTo.getTime();
+            metricContext.certMetrics['runLocation'] = `${metricContext.monitoringConfiguration.type}-cert`
+            return metricContext
+        } else {
+            console.log(`unable to check certificate for ${metricContext.testId}. cert is null`)
+            return readCertError(metricContext, 'server cert is null')
+        }
+        
     }
 
 
@@ -93,7 +99,7 @@ function apiResponseElaborator(metricContext){
 
         if (metricContext.monitoringConfiguration.checkCertificate == 'true'){
             let serverCert = response.request.res.socket.getPeerCertificate(false);
-            console.log(`checking cert for ${metricContext.testId}`)
+            console.log(`checking cert for ${metricContext.testId}: ${JSON.stringify(serverCert)}`)
             metricContext = readCert(metricContext, serverCert)
         }
         let statusCodeOk = isStatusCodeAccepted(response.status, metricContext.monitoringConfiguration.expectedCodes)
