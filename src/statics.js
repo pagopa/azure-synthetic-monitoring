@@ -129,6 +129,7 @@ function apiResponseElaborator(metricContext){
         const bodyCompareStrategy = metricContext.monitoringConfiguration.bodyCompareStrategy
         if (!isNull(bodyCompareStrategy)){
             const expectedBody = metricContext.monitoringConfiguration.expectedBody
+            console.log(`comparing body for ${metricContext.testId}. Received body: ${response.data}`)
             bodyMatches =  comparator.compare(bodyCompareStrategy, response.data, expectedBody)
         }
 
