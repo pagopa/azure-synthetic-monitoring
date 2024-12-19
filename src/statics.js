@@ -1,7 +1,8 @@
 const statusCodeRangeSeparator = "-"
 const constants = require('./const')
 const comparator = require('./comparator')
-
+const tls = require('tls')
+const url = require('url')
 
 module.exports = {
     isNull,
@@ -100,7 +101,14 @@ function apiResponseElaborator(metricContext){
         if (metricContext.monitoringConfiguration.checkCertificate == 'true'){
             let serverCert = response.request.res.socket.getPeerCertificate(false);
             console.log(`checking cert for ${metricContext.testId}: ${JSON.stringify(serverCert)}`)
-            metricContext = readCert(metricContext, serverCert)
+            if(serverCert) {
+                metricContext = readCert(metricContext, serverCert)
+            } else {
+                console.log(`server cert is null, checking with tls...`)
+                let cert = await getCertWithTls(metricContext)
+                metricContext = readCert(metricContext, cert)
+            }
+            
         }
         let statusCodeOk = isStatusCodeAccepted(response.status, metricContext.monitoringConfiguration.expectedCodes)
         console.log(`status code accepted for ${metricContext.testId}? ${statusCodeOk}`)
@@ -140,6 +148,23 @@ function apiResponseElaborator(metricContext){
 
         return metricContext
     }
+}
+
+async function getCertWithTls(metricContext) {
+    return new Promise(function (resolve, reject){
+        let parsedUrl = new URL(metricContext.monitoringConfiguration.url)
+        const options = {
+            host: parsedUrl.host,
+            port: parsedUrl.port || parsedUrl.schema.includes('https') ? 443 : 80,
+            servername: parsedUrl.hostname,
+            rejectUnauthorized: true
+        };
+        const socket = tls.connect(options, () => {
+            const cert = socket.getPeerCertificate();
+            socket.end(); 
+            resolve(cert);
+        });
+    })
 }
 
 /**
