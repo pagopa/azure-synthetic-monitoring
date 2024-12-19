@@ -104,9 +104,16 @@ function apiResponseElaborator(metricContext){
             if(serverCert) {
                 metricContext = readCert(metricContext, serverCert)
             } else {
-                console.log(`server cert is null, checking with tls...`)
-                let cert = await getCertWithTls(metricContext)
-                metricContext = readCert(metricContext, cert)
+                console.log(`server cert is null for ${metricContext.testId}, checking with tls...`)
+                try{
+                    let cert = await getCertWithTls(metricContext)
+                    metricContext = readCert(metricContext, cert)
+                } catch(error) {
+                    console.log(`failed to load server cert for ${metricContext.testId}`)
+                    metricContext = readCertError(metricContext, {message: error}) 
+                }
+
+                
             }
             
         }
