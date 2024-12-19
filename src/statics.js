@@ -155,7 +155,7 @@ async function getCertWithTls(metricContext) {
         let parsedUrl = new URL(metricContext.monitoringConfiguration.url)
         const options = {
             host: parsedUrl.host,
-            port: parsedUrl.port || parsedUrl.schema.includes('https') ? 443 : 80,
+            port: parsedUrl.port || parsedUrl.protocol.includes('https') ? 443 : 80,
             servername: parsedUrl.hostname,
             rejectUnauthorized: true
         };
