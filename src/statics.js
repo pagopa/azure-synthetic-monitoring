@@ -106,8 +106,9 @@ function apiResponseElaborator(metricContext){
             } else {
                 console.log(`server cert is null for ${metricContext.testId}, checking with tls...`)
                 try{
-                    let cert = await getCertWithTls(metricContext)
-                    metricContext = readCert(metricContext, cert)
+                    let certAndSocket = await getCertWithTls(metricContext)
+                    certAndSocket.socket.end()
+                    metricContext = readCert(metricContext, certAndSocket.cert)
                 } catch(error) {
                     console.log(`failed to load server cert for ${metricContext.testId}`)
                     metricContext = readCertError(metricContext, {message: error}) 
@@ -168,9 +169,8 @@ async function getCertWithTls(metricContext) {
         };
         const socket = tls.connect(options, () => {
             const cert = socket.getPeerCertificate();
-            socket.end(); 
             console.log(`got cert using tls for ${metricContext.testId}: ${JSON.stringify(cert)}`)
-            resolve(cert);
+            resolve({cert: cert, socket: socket});
         });
     })
 }
