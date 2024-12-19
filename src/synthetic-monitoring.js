@@ -2,12 +2,13 @@
 const appInsights = require("applicationinsights");
 const axios = require('axios');
 const { TableClient, AzureNamedKeyCredential } = require("@azure/data-tables");
+const process = require('process')
 
 // modules
 const utils = require('./utils')
 const statics = require('./statics')
 const constants = require('./const')
-const process = require('process')
+
 
 //env vars
 const account = process.env.STORAGE_ACCOUNT_NAME;
