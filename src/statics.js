@@ -172,6 +172,10 @@ async function getCertWithTls(metricContext) {
             console.log(`got cert using tls for ${metricContext.testId}: ${JSON.stringify(cert)}`)
             resolve({cert: cert, socket: socket});
         });
+        socket.on('error', (err) => {
+            console.log(`socket error for ${metricContext.testId}: ${JSON.stringify(err)}`);
+            socket.end();
+        });
     })
 }
 
