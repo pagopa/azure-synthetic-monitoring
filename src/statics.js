@@ -156,7 +156,7 @@ async function getCertWithTls(metricContext) {
         const options = {
             host: parsedUrl.host,
             port: parsedUrl.port || parsedUrl.protocol.includes('https') ? 443 : 80,
-            servername: parsedUrl.hostname,
+            servername: metricContext.monitoringConfiguration.headers["Host"] || parsedUrl.hostname,
             rejectUnauthorized: true
         };
         const socket = tls.connect(options, () => {
