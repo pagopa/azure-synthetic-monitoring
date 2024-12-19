@@ -67,7 +67,7 @@ function readCert(metricContext, certResponse){
             return metricContext
         } else {
             console.log(`unable to check certificate for ${metricContext.testId}. cert is null`)
-            return readCertError(metricContext, 'server cert is null')
+            return readCertError(metricContext, {message: 'server cert is null'})
         }
         
     }
