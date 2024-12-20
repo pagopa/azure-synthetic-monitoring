@@ -1,6 +1,7 @@
 const statusCodeRangeSeparator = "-"
 const constants = require('./const')
 const comparator = require('./comparator')
+const tls = require('tls')
 
 
 module.exports = {
@@ -13,7 +14,8 @@ module.exports = {
     extractTlsVersion,
     buildRequest,
     initMetricObjects,
-    isStatusCodeAccepted
+    isStatusCodeAccepted,
+    getCert
 }
 
 /**
@@ -54,16 +56,22 @@ function enrichData(baseData, checkResult, keyList){
  * @returns receives the certResponse and returns the enriched metric context
  */
 function readCert(metricContext, certResponse){
-        const millisBeforeExpiration = metricContext.monitoringConfiguration.certValidityRangeDays * 24 * 60 * 60 * 1000
-        console.log(`cert response for ${metricContext.testId}: valid to ${certResponse.valid_to}`)
-        let validTo = new Date(certResponse.valid_to);
-        const millisToExpiration = validTo - Date.now();
-        metricContext.certMetrics['success'] = millisToExpiration > millisBeforeExpiration;
-        metricContext.certMetrics['certSuccess'] = millisToExpiration > millisBeforeExpiration ? 1 : 0
-        metricContext.certMetrics['targetExpireInDays'] = Math.floor(millisToExpiration / 86400000); //convert in days
-        metricContext.certMetrics['targetExpirationTimestamp'] = validTo.getTime();
-        metricContext.certMetrics['runLocation'] = `${metricContext.monitoringConfiguration.type}-cert`
-        return metricContext
+        if (certResponse != null) {
+            const millisBeforeExpiration = metricContext.monitoringConfiguration.certValidityRangeDays * 24 * 60 * 60 * 1000
+            console.log(`cert response for ${metricContext.testId}: valid to ${certResponse.valid_to}`)
+            let validTo = new Date(certResponse.valid_to);
+            const millisToExpiration = validTo - Date.now();
+            metricContext.certMetrics['success'] = millisToExpiration > millisBeforeExpiration;
+            metricContext.certMetrics['certSuccess'] = millisToExpiration > millisBeforeExpiration ? 1 : 0
+            metricContext.certMetrics['targetExpireInDays'] = Math.floor(millisToExpiration / 86400000); //convert in days
+            metricContext.certMetrics['targetExpirationTimestamp'] = validTo.getTime();
+            metricContext.certMetrics['runLocation'] = `${metricContext.monitoringConfiguration.type}-cert`
+            return metricContext
+        } else {
+            console.log(`unable to check certificate for ${metricContext.testId}. cert is null`)
+            return readCertError(metricContext, {message: 'server cert is null'})
+        }
+        
     }
 
 
@@ -92,9 +100,15 @@ function apiResponseElaborator(metricContext){
         console.log(`api response for ${metricContext.testId}: ${response.status}`)
 
         if (metricContext.monitoringConfiguration.checkCertificate == 'true'){
-            let serverCert = response.request.res.socket.getPeerCertificate(false);
-            console.log(`checking cert for ${metricContext.testId}`)
-            metricContext = readCert(metricContext, serverCert)
+            let serverCert = await getCert(metricContext, response, tls);
+            console.log(`checking cert for ${metricContext.testId}: ${JSON.stringify(serverCert)}`)
+
+            if(serverCert) {
+                metricContext = readCert(metricContext, serverCert)
+            } else {
+                metricContext = readCertError(metricContext, {message: error}) 
+                
+            }
         }
         let statusCodeOk = isStatusCodeAccepted(response.status, metricContext.monitoringConfiguration.expectedCodes)
         console.log(`status code accepted for ${metricContext.testId}? ${statusCodeOk}`)
@@ -107,6 +121,7 @@ function apiResponseElaborator(metricContext){
         const bodyCompareStrategy = metricContext.monitoringConfiguration.bodyCompareStrategy
         if (!isNull(bodyCompareStrategy)){
             const expectedBody = metricContext.monitoringConfiguration.expectedBody
+            console.log(`comparing body for ${metricContext.testId}. Received body: ${response.data}`)
             bodyMatches =  comparator.compare(bodyCompareStrategy, response.data, expectedBody)
         }
 
@@ -134,6 +149,48 @@ function apiResponseElaborator(metricContext){
 
         return metricContext
     }
+}
+
+
+async function getCert(metricContext, response, tlsClient){
+    let serverCert = response.request.res.socket.getPeerCertificate(false);
+    console.log(`cert from response for ${metricContext.testId}: ${JSON.stringify(serverCert)}`)
+    if (serverCert) {
+        return serverCert
+    } else {
+        console.log(`server cert is null for ${metricContext.testId}, checking with tls...`)
+        try{
+            serverCert = await getCertWithTls(metricContext, tlsClient)
+        } catch(error) {
+            console.log(`failed to load server cert for ${metricContext.testId}`)
+            serverCert = null
+        }
+        return serverCert
+    }
+}
+
+async function getCertWithTls(metricContext, tlsClient){ 
+    return new Promise(function (resolve, reject){
+        let parsedUrl = new URL(metricContext.monitoringConfiguration.url)
+        const options = {
+            host: parsedUrl.host,
+            port: parsedUrl.port || parsedUrl.protocol.includes('https') ? 443 : 80,
+            servername: metricContext.monitoringConfiguration.headers["Host"] || parsedUrl.hostname,
+            rejectUnauthorized: true
+        };
+        const socket = tlsClient.connect(options, () => {
+            const cert = socket.getPeerCertificate();
+            console.log(`got cert using tls for ${metricContext.testId}: ${JSON.stringify(cert)}`)
+            resolve({cert: cert, socket: socket});
+        });
+        socket.on('error', (err) => {
+            console.log(`socket error for ${metricContext.testId}: ${JSON.stringify(err)}`);
+            socket.end();
+        });
+    }).then((result => {
+        result.socket.end();
+        return result.cert;
+    }))
 }
 
 /**

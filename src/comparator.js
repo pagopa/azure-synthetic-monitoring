@@ -119,7 +119,7 @@ const xmlContains = function (actual, expected) {
   try{
     const parser = new XMLParser();
     let actualParsed = parser.parse(actual);
-    console.log(actualParsed)
+    console.debug(actualParsed)
     result = this.contains(actualParsed, expected);
   } catch (err) {
     console.error(`failed check: ${err}`)
