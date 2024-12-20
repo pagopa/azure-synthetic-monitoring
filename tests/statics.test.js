@@ -157,10 +157,10 @@ describe('certResponseElaborator tests', () => {
       success : false,
       runLocation: `${dummyMetricContex.monitoringConfiguration.type}-cert`
     }
-  
+
     expect(statics.readCert(dummyMetricContex, mockCertResponse)).toMatchObject({ certMetrics: expectedCertMetric});
-  
-  
+
+
   });
 
 })
@@ -562,5 +562,38 @@ describe('initMetricObjects tests', () => {
     expect(result).toEqual(expected);
   });
 
+
+})
+
+
+describe('getCert tests', () => {
+
+  test('returns cert when found in response', () => {
+    let validTo = new Date();
+    validTo.setDate(validTo.getDate() + 9);
+    let mockCertResponse = {valid_to: validTo}
+    
+    let mockApiResponse = {
+      request: {
+        res: {
+          socket: {
+            getPeerCertificate: function(bool){
+              return mockCertResponse
+            }
+          }
+        }
+      }
+    }
+    let mockTlsClient = {
+      connect : function(){}
+    }
+    let jestMockTlsClient = jest.spyOn(mockTlsClient, 'connect')
+    statics.getCert(dummyMetricContex, mockApiResponse, jestMockTlsClient).then(data =>{
+      expect(data).toMatchObject(mockCertResponse);
+
+      expect(jestMockTlsClient).not.toHaveBeenCalled()
+    })
+
+  });
 
 })
