@@ -4,6 +4,9 @@ const axios = require('axios');
 const { TableClient, AzureNamedKeyCredential } = require("@azure/data-tables");
 const process = require('process')
 
+var rootCas = require('ssl-root-cas/latest').create();
+
+
 // modules
 const utils = require('./utils')
 const statics = require('./statics')
@@ -44,6 +47,7 @@ const failedMonitoringEvent = {
   runLocation: location,
 }
 
+require('https').globalAgent.options.ca = rootCas;
 //prepare axios interceptors
 axios.interceptors.response.use(function (response) {
     //adding tls version to response
