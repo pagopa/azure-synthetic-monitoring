@@ -2,6 +2,7 @@ const statusCodeRangeSeparator = "-"
 const constants = require('./const')
 const comparator = require('./comparator')
 const tls = require('tls')
+const https = require('node:https');
 
 
 module.exports = {
@@ -262,9 +263,9 @@ function buildRequest(monitoringConfiguration){
         request['data']= monitoringConfiguration.body;
     }
 
-//    if(monitoringConfiguration.privateCert){
-//      request['httpsAgent'] = new https.Agent({ cert: fs.readFileSync("./usercert.pem"), })
-//    }
+    if(monitoringConfiguration.privateCert){
+      request['httpsAgent'] = new https.Agent({ cert: monitoringConfiguration.privateCert, })
+    }
 
     return request;
 }
