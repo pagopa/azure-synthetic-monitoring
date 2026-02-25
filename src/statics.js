@@ -71,7 +71,7 @@ function readCert(metricContext, certResponse){
             console.log(`unable to check certificate for ${metricContext.testId}. cert is null`)
             return readCertError(metricContext, {message: 'server cert is null'})
         }
-        
+
     }
 
 
@@ -106,8 +106,8 @@ function apiResponseElaborator(metricContext){
             if(serverCert) {
                 metricContext = readCert(metricContext, serverCert)
             } else {
-                metricContext = readCertError(metricContext, {message: error}) 
-                
+                metricContext = readCertError(metricContext, {message: error})
+
             }
         }
         let statusCodeOk = isStatusCodeAccepted(response.status, metricContext.monitoringConfiguration.expectedCodes)
@@ -169,7 +169,7 @@ async function getCert(metricContext, response, tlsClient){
     }
 }
 
-async function getCertWithTls(metricContext, tlsClient){ 
+async function getCertWithTls(metricContext, tlsClient){
     return new Promise(function (resolve, reject){
         let parsedUrl = new URL(metricContext.monitoringConfiguration.url)
         const options = {
@@ -261,6 +261,10 @@ function buildRequest(monitoringConfiguration){
     if (["post", "put", "delete", "patch"].includes(monitoringConfiguration.method.toLowerCase())){
         request['data']= monitoringConfiguration.body;
     }
+
+//    if(monitoringConfiguration.privateCert){
+//      request['httpsAgent'] = new https.Agent({ cert: fs.readFileSync("./usercert.pem"), })
+//    }
 
     return request;
 }
