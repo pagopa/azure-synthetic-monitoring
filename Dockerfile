@@ -6,4 +6,4 @@ COPY package.json ./
 USER node
 RUN npm install
 COPY --chown=node:node src/*.js .
-CMD [ "node", "synthetic-monitoring.js" ]
+CMD [ "node", "scheduled-entry-point.js" ]
