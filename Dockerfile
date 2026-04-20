@@ -1,4 +1,4 @@
-FROM node:18.19.0-buster
+FROM node:lts-alpine3.22
 
 RUN mkdir -p /home/node/app/node_modules && chown -R node:node /home/node/app
 WORKDIR /home/node/app
