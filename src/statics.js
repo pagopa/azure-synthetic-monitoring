@@ -15,7 +15,8 @@ module.exports = {
     buildRequest,
     initMetricObjects,
     isStatusCodeAccepted,
-    getCert
+    getCert,
+    monitorConfigurationFilterByName
 }
 
 /**
@@ -71,7 +72,7 @@ function readCert(metricContext, certResponse){
             console.log(`unable to check certificate for ${metricContext.testId}. cert is null`)
             return readCertError(metricContext, {message: 'server cert is null'})
         }
-        
+
     }
 
 
@@ -106,8 +107,8 @@ function apiResponseElaborator(metricContext){
             if(serverCert) {
                 metricContext = readCert(metricContext, serverCert)
             } else {
-                metricContext = readCertError(metricContext, {message: error}) 
-                
+                metricContext = readCertError(metricContext, {message: error})
+
             }
         }
         let statusCodeOk = isStatusCodeAccepted(response.status, metricContext.monitoringConfiguration.expectedCodes)
@@ -169,7 +170,7 @@ async function getCert(metricContext, response, tlsClient){
     }
 }
 
-async function getCertWithTls(metricContext, tlsClient){ 
+async function getCertWithTls(metricContext, tlsClient){
     return new Promise(function (resolve, reject){
         let parsedUrl = new URL(metricContext.monitoringConfiguration.url)
         const options = {
@@ -327,4 +328,16 @@ function isStatusCodeAccepted(statusCode, acceptedCodes){
         }
     })
     return accepted;
+}
+
+
+/**
+ * creates a filter function that checks if a monitoring configuration's app name is in the accepted names list
+ * @param {list(string)} acceptedNames list of accepted app names
+ * @returns a filter function that returns true if the monitoring configuration's appName is in acceptedNames
+ */
+function monitorConfigurationFilterByName(acceptedNames){
+    return function (monitoringConfiguration) {
+      return acceptedNames.includes(monitoringConfiguration.appName);
+    }
 }

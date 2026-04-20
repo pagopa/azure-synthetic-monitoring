@@ -27,6 +27,10 @@ const tableClient = new TableClient(`https://${account}.table.core.windows.net`,
 const client = new appInsights.TelemetryClient(process.env.APP_INSIGHT_CONNECTION_STRING);
 
 
+module.exports = {
+    execute
+}
+
 //constants
 const successMonitoringEvent = {
   id: `${availabilityPrefix}-monitoring-function`,
@@ -68,7 +72,7 @@ axios.interceptors.request.use(
   );
 
 
-async function main() {
+async function execute() {
     let tableEntities = tableClient.listEntities();
     let tests = []
     const startTime = Date.now();
@@ -148,5 +152,3 @@ async function testIt(monitoringConfiguration, telemetryClient, httpClient){
 
 }
 
-//start process
-main()
