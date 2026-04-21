@@ -7,6 +7,7 @@ module.exports = {
     trackSelfAvailabilityEvent,
     eventSender,
     telemetrySender,
+    eventAndTelemetrySender,
     checkApi
 }
 
@@ -75,6 +76,19 @@ function telemetrySender(client){
         }
         console.log("telemetry sent")
         return metricContext
+    }
+}
+
+
+/**
+ * sends event and telemetry sequentially
+ * @param {TelemetryClient} client
+ * @returns  an async function that receives and returns the metric context
+ */
+function eventAndTelemetrySender(client){
+    return async function(metricContext){
+        const contextAfterEvent = await eventSender(client)(metricContext);
+        return await telemetrySender(client)(contextAfterEvent);
     }
 }
 

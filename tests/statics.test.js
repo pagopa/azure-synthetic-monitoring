@@ -572,7 +572,7 @@ describe('getCert tests', () => {
     let validTo = new Date();
     validTo.setDate(validTo.getDate() + 9);
     let mockCertResponse = {valid_to: validTo}
-    
+
     let mockApiResponse = {
       request: {
         res: {
@@ -596,4 +596,63 @@ describe('getCert tests', () => {
 
   });
 
+})
+
+
+describe('monitorConfigurationFilterByName tests', () => {
+  test('returns true when appName is in acceptedNames list', () => {
+    let acceptedNames = ["myApp", "otherApp"]
+    let monitoringConfiguration = { apiName: "test-api", appName: "myApp" }
+    let filterFunction = statics.monitorConfigurationFilterByName(acceptedNames)
+
+    expect(filterFunction(monitoringConfiguration)).toBe(true);
+  });
+
+  test('returns false when appName is not in acceptedNames list', () => {
+    let acceptedNames = ["myApp", "otherApp"]
+    let monitoringConfiguration = { apiName: "test-api", appName: "notInList" }
+    let filterFunction = statics.monitorConfigurationFilterByName(acceptedNames)
+
+    expect(filterFunction(monitoringConfiguration)).toBe(false);
+  });
+
+  test('works with array filter method', () => {
+    let acceptedNames = ["myApp", "otherApp"]
+    let configurations = [
+      { apiName: "test-api", appName: "myApp" },
+      { apiName: "other-api", appName: "notInList" },
+      { apiName: "third-api", appName: "otherApp" }
+    ]
+    let filterFunction = statics.monitorConfigurationFilterByName(acceptedNames)
+    let filtered = configurations.filter(filterFunction)
+
+    expect(filtered).toEqual([
+      { apiName: "test-api", appName: "myApp" },
+      { apiName: "third-api", appName: "otherApp" }
+    ]);
+  });
+
+  test('returns false when acceptedNames is empty', () => {
+    let acceptedNames = []
+    let monitoringConfiguration = { apiName: "test-api", appName: "myApp" }
+    let filterFunction = statics.monitorConfigurationFilterByName(acceptedNames)
+
+    expect(filterFunction(monitoringConfiguration)).toBe(false);
+  });
+
+  test('filters case-sensitive by default', () => {
+    let acceptedNames = ["myApp"]
+    let monitoringConfiguration = { apiName: "test-api", appName: "MyApp" }
+    let filterFunction = statics.monitorConfigurationFilterByName(acceptedNames)
+
+    expect(filterFunction(monitoringConfiguration)).toBe(false);
+  });
+
+  test('returns true when appName exactly matches one of acceptedNames', () => {
+    let acceptedNames = ["appOne", "appTwo", "appThree"]
+    let monitoringConfiguration = { apiName: "some-api", appName: "appTwo" }
+    let filterFunction = statics.monitorConfigurationFilterByName(acceptedNames)
+
+    expect(filterFunction(monitoringConfiguration)).toBe(true);
+  });
 })

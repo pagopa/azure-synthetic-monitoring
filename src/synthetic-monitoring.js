@@ -153,8 +153,7 @@ async function testIt(monitoringConfiguration, telemetryClient, httpClient){
   }
 
   return utils.checkApi(metricContex, httpClient)
-  .then(utils.telemetrySender(telemetryClient))
-  .then(utils.eventSender(telemetryClient))
+  .then(utils.eventAndTelemetrySender(telemetryClient))
 
 }
 
