@@ -8,7 +8,10 @@ module.exports = {
     eventSender,
     telemetrySender,
     eventAndTelemetrySender,
-    checkApi
+    checkApi,
+    logSender,
+    logSuccess,
+    logError
 }
 
 /**
@@ -109,4 +112,16 @@ async function checkApi(metricContext, httpClient){
         .catch(statics.apiErrorElaborator(metricContext))
 }
 
+
+function logSender(metricContext){
+  console.log(`logSender ${metricContext.testId}: ${JSON.stringify(metricContext)}`)
+}
+
+function logSuccess(result, startTime) {
+  console.log(`logSuccess result: ${JSON.stringify(result)}`)
+}
+
+function logError(error, startTime) {
+  console.error(`FAILURE: ${error}`)
+}
 

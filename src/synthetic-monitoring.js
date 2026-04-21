@@ -8,6 +8,7 @@ const process = require('process')
 const utils = require('./utils')
 const statics = require('./statics')
 const constants = require('./const')
+const {start} = require("applicationinsights");
 
 
 //env vars
@@ -24,28 +25,11 @@ appInsights.setup(process.env.APP_INSIGHT_CONNECTION_STRING).start();
 //clients
 const credential = new AzureNamedKeyCredential(account, accountKey);
 const tableClient = new TableClient(`https://${account}.table.core.windows.net`, tableName, credential);
-const client = new appInsights.TelemetryClient(process.env.APP_INSIGHT_CONNECTION_STRING);
+
 
 
 module.exports = {
     execute
-}
-
-//constants
-const successMonitoringEvent = {
-  id: `${availabilityPrefix}-monitoring-function`,
-  message: "",
-  success : true,
-  name: `${availabilityPrefix}-monitoring-function`,
-  runLocation: location,
-}
-
-const failedMonitoringEvent = {
-  id: `${availabilityPrefix}-monitoring-function`,
-  message: "At least one test failed to execute",
-  success : false,
-  name: `${availabilityPrefix}-monitoring-function`,
-  runLocation: location,
 }
 
 //prepare axios interceptors
@@ -72,7 +56,7 @@ axios.interceptors.request.use(
   );
 
 
-async function execute(monitoringConfigurationFilter) {
+async function execute(monitoringConfigurationFilter, sender, onSuccess, onFailure) {
     let tableEntities = tableClient.listEntities();
     let tests = []
     const startTime = Date.now();
@@ -100,7 +84,7 @@ async function execute(monitoringConfigurationFilter) {
 
             if(monitoringConfigurationFilter(monitoringConfiguration)){
               console.log(`monitoringConfiguration ${monitoringConfiguration.appName}_${monitoringConfiguration.apiName} passed the filter, adding test promise`)
-              tests.push(testIt(monitoringConfiguration, client, axios).catch((error) => {
+              tests.push(testIt(monitoringConfiguration, axios, sender).catch((error) => {
                 console.error(`error in test for ${JSON.stringify(monitoringConfiguration)}: ${JSON.stringify(error.message)}`)
               }));
             }
@@ -117,8 +101,8 @@ async function execute(monitoringConfigurationFilter) {
     }
 
     await Promise.all(tests)
-                 .then((result) => {utils.trackSelfAvailabilityEvent(successMonitoringEvent, startTime, client, "ok"); console.log("SUCCESS")})
-                 .catch((error) => {utils.trackSelfAvailabilityEvent(failedMonitoringEvent, startTime, client, error); console.error(`FAILURE: ${error}`)})
+                 .then(onSuccess(result, startTime))
+                 .catch(onFailure(error, startTime))
 };
 
 
@@ -131,7 +115,7 @@ async function execute(monitoringConfigurationFilter) {
  * @param {axios} httpClient axios client
  * @returns promise rejected in case of a test EXECUTION failure
  */
-async function testIt(monitoringConfiguration, telemetryClient, httpClient){
+async function testIt(monitoringConfiguration, httpClient, sender){
   console.log(`preparing test for ${JSON.stringify(monitoringConfiguration)}`)
 
   let metricObjects =  statics.initMetricObjects(monitoringConfiguration);
@@ -153,7 +137,8 @@ async function testIt(monitoringConfiguration, telemetryClient, httpClient){
   }
 
   return utils.checkApi(metricContex, httpClient)
-  .then(utils.eventAndTelemetrySender(telemetryClient))
+    .then(sender)
+
 
 }
 
