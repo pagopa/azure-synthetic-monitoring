@@ -8,7 +8,7 @@ const tester = require('./synthetic-monitoring')
 async function main() {
    // call tester with a "keep all" filter
 //   await tester.execute((monConfig) => true);
-   await tester.execute(statics.monitorConfigurationFilterByName(['fe']));
+   await tester.execute(statics.monitorConfigurationFilterByName(['fe', 'asd']));
 };
 
 //start process
