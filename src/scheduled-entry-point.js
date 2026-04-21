@@ -4,7 +4,8 @@ const utils = require('./utils')
 const tester = require('./synthetic-monitoring')
 const appInsights = require("applicationinsights");
 const process = require("process");
-
+const availabilityPrefix = process.env.AVAILABILITY_PREFIX
+const location = process.env.LOCATION
 const telemetryClient = new appInsights.TelemetryClient(process.env.APP_INSIGHT_CONNECTION_STRING);
 
 //constants
