@@ -33,15 +33,30 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker image
+      - name: Build and push schedule trigger Docker image
         id: docker_build_push
         # from https://github.com/docker/build-push-action/commits/master
         uses: docker/build-push-action@c56af957549030174b10d6867f20e78cfd7debc5
         with:
           context: .
+          file: Dockerfile-crontrigger
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:beta-${{ github.ref_name }}
+            ghcr.io/${{ github.repository }}:beta-${{ github.ref_name }}-cron
+          labels: |
+            maintainer=https://pagopa.it
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+
+      - name: Build and push queue trigger Docker image
+        id: docker_build_push
+        # from https://github.com/docker/build-push-action/commits/master
+        uses: docker/build-push-action@c56af957549030174b10d6867f20e78cfd7debc5
+        with:
+          context: .
+          file: Dockerfile-queuetrigger
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:beta-${{ github.ref_name }}-queue
           labels: |
             maintainer=https://pagopa.it
             org.opencontainers.image.source=https://github.com/${{ github.repository }}

@@ -72,12 +72,12 @@ axios.interceptors.request.use(
   );
 
 
-async function execute() {
+async function execute(monitoringConfigurationFilter) {
     let tableEntities = tableClient.listEntities();
     let tests = []
     const startTime = Date.now();
     for await (const tableConfiguration of tableEntities) {
-    try{
+        try {
             //property names remap and parsing
             let nameSplit = tableConfiguration.partitionKey.split("-")
             let monitoringConfiguration = {
@@ -98,11 +98,17 @@ async function execute() {
             }
             console.log(`monitoringConfiguration: ${JSON.stringify(monitoringConfiguration)}`)
 
-            tests.push(testIt(monitoringConfiguration, client, axios).catch((error) => {
+            if(monitoringConfigurationFilter(monitoringConfiguration)){
+              console.log(`monitoringConfiguration ${monitoringConfiguration.appName}_${monitoringConfiguration.apiName} passed the filter, adding test promise`)
+              tests.push(testIt(monitoringConfiguration, client, axios).catch((error) => {
                 console.error(`error in test for ${JSON.stringify(monitoringConfiguration)}: ${JSON.stringify(error.message)}`)
-            }));
+              }));
+            }
 
-        }catch (parseError){
+
+
+
+        } catch (parseError){
             console.error(`error parsing test for ${JSON.stringify(tableConfiguration)}. ${parseError.message}`)
             tests.push(new Promise((resolve, reject) => {
                 reject(parseError.message)
