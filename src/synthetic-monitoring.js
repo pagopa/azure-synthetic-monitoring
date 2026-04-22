@@ -100,8 +100,8 @@ async function execute(monitoringConfigurationFilter, sender, onSuccess, onFailu
     }
 
     await Promise.all(tests)
-                 .then(onSuccess(result, startTime))
-                 .catch(onFailure(error, startTime))
+                 .then(onSuccess(startTime))
+                 .catch(onFailure(startTime))
 };
 
 

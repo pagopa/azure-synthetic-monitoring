@@ -39,11 +39,11 @@ async function main() {
 };
 
 
-function onTestSuccess(result, startTime){
+function onTestSuccess(startTime){
   return (result) => {utils.trackSelfAvailabilityEvent(successMonitoringEvent, startTime, telemetryClient, "ok"); console.log("SUCCESS")}
 }
 
-function onTestFailure(error, startTime){
+function onTestFailure(startTime){
   return (error) => {utils.trackSelfAvailabilityEvent(failedMonitoringEvent, startTime, telemetryClient, error); console.error(`FAILURE: ${error}`)}
 }
 

@@ -117,11 +117,11 @@ function logSender(metricContext){
   console.log(`logSender ${metricContext.testId}: ${JSON.stringify(metricContext)}`)
 }
 
-function logSuccess(result, startTime) {
-  console.log(`logSuccess result: ${JSON.stringify(result)}`)
+function logSuccess(startTime) {
+  return (result) => console.log(`logSuccess result: ${JSON.stringify(result)}`)
 }
 
-function logError(error, startTime) {
-  console.error(`FAILURE: ${error}`)
+function logError(startTime) {
+  (error) => console.error(`FAILURE: ${error}`)
 }
 
