@@ -2,6 +2,7 @@ const statusCodeRangeSeparator = "-"
 const constants = require('./const')
 const comparator = require('./comparator')
 const tls = require('tls')
+const logger = require('./logger')
 
 
 module.exports = {
@@ -59,7 +60,7 @@ function enrichData(baseData, checkResult, keyList){
 function readCert(metricContext, certResponse){
         if (certResponse != null) {
             const millisBeforeExpiration = metricContext.monitoringConfiguration.certValidityRangeDays * 24 * 60 * 60 * 1000
-            console.log(`cert response for ${metricContext.testId}: valid to ${certResponse.valid_to}`)
+            logger.info(`cert response for ${metricContext.testId}: valid to ${certResponse.valid_to}`)
             let validTo = new Date(certResponse.valid_to);
             const millisToExpiration = validTo - Date.now();
             metricContext.certMetrics['success'] = millisToExpiration > millisBeforeExpiration;
@@ -69,7 +70,7 @@ function readCert(metricContext, certResponse){
             metricContext.certMetrics['runLocation'] = `${metricContext.monitoringConfiguration.type}-cert`
             return metricContext
         } else {
-            console.log(`unable to check certificate for ${metricContext.testId}. cert is null`)
+            logger.info(`unable to check certificate for ${metricContext.testId}. cert is null`)
             return readCertError(metricContext, {message: 'server cert is null'})
         }
 
@@ -83,7 +84,7 @@ function readCert(metricContext, certResponse){
  * @returns an async function that receives an error and returns the enriched metric context
  */
 function readCertError(metricContext, error){
-        console.log(`cert error for ${metricContext.testId}: ${JSON.stringify(error)}`)
+        logger.info(`cert error for ${metricContext.testId}: ${JSON.stringify(error)}`)
         metricContext.certMetrics['message'] = error.message
         metricContext.certMetrics['runLocation'] = `${metricContext.monitoringConfiguration.type}-cert`
         metricContext.certMetrics['success'] = false
@@ -98,11 +99,11 @@ function readCertError(metricContext, error){
  */
 function apiResponseElaborator(metricContext){
     return async function(response){
-        console.log(`api response for ${metricContext.testId}: ${response.status}`)
+        logger.info(`api response for ${metricContext.testId}: ${response.status}`)
 
         if (metricContext.monitoringConfiguration.checkCertificate == 'true'){
             let serverCert = await getCert(metricContext, response, tls);
-            console.log(`checking cert for ${metricContext.testId}: ${JSON.stringify(serverCert)}`)
+            logger.debug(`checking cert for ${metricContext.testId}: ${JSON.stringify(serverCert)}`)
 
             if(serverCert) {
                 metricContext = readCert(metricContext, serverCert)
@@ -112,7 +113,7 @@ function apiResponseElaborator(metricContext){
             }
         }
         let statusCodeOk = isStatusCodeAccepted(response.status, metricContext.monitoringConfiguration.expectedCodes)
-        console.log(`status code accepted for ${metricContext.testId}? ${statusCodeOk}`)
+        logger.info(`status code accepted for ${metricContext.testId}? ${statusCodeOk}`)
         let errorMessage = ""
 
         let duration = response[constants.RESPONSE_TIME_KEY];
@@ -122,7 +123,7 @@ function apiResponseElaborator(metricContext){
         const bodyCompareStrategy = metricContext.monitoringConfiguration.bodyCompareStrategy
         if (!isNull(bodyCompareStrategy)){
             const expectedBody = metricContext.monitoringConfiguration.expectedBody
-            console.log(`comparing body for ${metricContext.testId}. Received body: ${response.data}`)
+            logger.info(`comparing body for ${metricContext.testId}. Received body: ${response.data}`)
             bodyMatches =  comparator.compare(bodyCompareStrategy, response.data, expectedBody)
         }
 
@@ -155,15 +156,15 @@ function apiResponseElaborator(metricContext){
 
 async function getCert(metricContext, response, tlsClient){
     let serverCert = response.request.res.socket.getPeerCertificate(false);
-    console.log(`cert from response for ${metricContext.testId}: ${JSON.stringify(serverCert)}`)
+    logger.info(`cert from response for ${metricContext.testId}: ${JSON.stringify(serverCert)}`)
     if (serverCert) {
         return serverCert
     } else {
-        console.log(`server cert is null for ${metricContext.testId}, checking with tls...`)
+        logger.info(`server cert is null for ${metricContext.testId}, checking with tls...`)
         try{
             serverCert = await getCertWithTls(metricContext, tlsClient)
         } catch(error) {
-            console.log(`failed to load server cert for ${metricContext.testId}`)
+            logger.error(`failed to load server cert for ${metricContext.testId}`)
             serverCert = null
         }
         return serverCert
@@ -181,11 +182,11 @@ async function getCertWithTls(metricContext, tlsClient){
         };
         const socket = tlsClient.connect(options, () => {
             const cert = socket.getPeerCertificate();
-            console.log(`got cert using tls for ${metricContext.testId}: ${JSON.stringify(cert)}`)
+            logger.debug(`got cert using tls for ${metricContext.testId}: ${JSON.stringify(cert)}`)
             resolve({cert: cert, socket: socket});
         });
         socket.on('error', (err) => {
-            console.log(`socket error for ${metricContext.testId}: ${JSON.stringify(err)}`);
+            logger.error(`socket error for ${metricContext.testId}: ${JSON.stringify(err)}`);
             socket.end();
         });
     }).then((result => {
@@ -201,11 +202,10 @@ async function getCertWithTls(metricContext, tlsClient){
  */
 function apiErrorElaborator(metricContext){
     return async function(error){
-        console.log(`api error for ${metricContext.testId}: ${JSON.stringify(error.message)}`)
+        logger.info(`api error for ${metricContext.testId}: ${JSON.stringify(error.message)}`)
         let elapsedMillis = Date.now() - metricContext['startTime'];
 
         if (metricContext.monitoringConfiguration.checkCertificate == 'true'){
-            console.log(`cert error for${metricContext.testId}`)
             metricContext = readCertError(metricContext, error)
         }
 

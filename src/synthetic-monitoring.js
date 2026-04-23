@@ -8,7 +8,7 @@ const process = require('process')
 const utils = require('./utils')
 const statics = require('./statics')
 const constants = require('./const')
-const {start} = require("applicationinsights");
+const logger = require('./logger')
 
 
 //env vars
@@ -28,7 +28,7 @@ const tableClient = new TableClient(`https://${account}.table.core.windows.net`,
 
 
 module.exports = {
-    execute
+  runMonitoring
 }
 
 //prepare axios interceptors
@@ -38,7 +38,7 @@ axios.interceptors.response.use(function (response) {
     response[constants.RESPONSE_TIME_KEY] = Date.now() - response.config.headers[constants.START_TIMESTAMP_KEY]
     return response;
   }, function (error) {
-    console.error(`resp error interceptor: ${JSON.stringify(error)}`)
+    logger.info(`resp error interceptor: ${JSON.stringify(error)}`)
     //nothing to do
     return Promise.reject(error);
   });
@@ -49,13 +49,13 @@ axios.interceptors.request.use(
       return config;
     },
     (error) => {
-      console.error(`req error interceptor: ${JSON.stringify(error)}`)
+      logger.info(`req error interceptor: ${JSON.stringify(error)}`)
       return Promise.reject(error);
     }
   );
 
 
-async function execute(monitoringConfigurationFilter, sender, onSuccess, onFailure) {
+async function runMonitoring(monitoringConfigurationFilter, sender, onSuccess, onFailure) {
     let tableEntities = tableClient.listEntities();
     let tests = []
     const startTime = Date.now();
@@ -79,12 +79,12 @@ async function execute(monitoringConfigurationFilter, sender, onSuccess, onFailu
                 availabilityPrefix,
                 certValidityRangeDays
             }
-            console.log(`monitoringConfiguration: ${JSON.stringify(monitoringConfiguration)}`)
+            logger.debug(`monitoringConfiguration: ${JSON.stringify(monitoringConfiguration)}`)
 
             if(monitoringConfigurationFilter(monitoringConfiguration)){
-              console.log(`monitoringConfiguration ${monitoringConfiguration.appName}_${monitoringConfiguration.apiName} passed the filter, adding test promise`)
+              logger.info(`monitoringConfiguration ${monitoringConfiguration.appName}_${monitoringConfiguration.apiName} passed the filter, adding test promise`)
               tests.push(testIt(monitoringConfiguration, axios, sender).catch((error) => {
-                console.error(`error in test for ${JSON.stringify(monitoringConfiguration)}: ${JSON.stringify(error.message)}`)
+                logger.error(`error in test for ${JSON.stringify(monitoringConfiguration)}: ${JSON.stringify(error.message)}`)
               }));
             }
 
@@ -92,7 +92,7 @@ async function execute(monitoringConfigurationFilter, sender, onSuccess, onFailu
 
 
         } catch (parseError){
-            console.error(`error parsing test for ${JSON.stringify(tableConfiguration)}. ${parseError.message}`)
+            logger.error(`error parsing test for ${JSON.stringify(tableConfiguration)}. ${parseError.message}`)
             tests.push(new Promise((resolve, reject) => {
                 reject(parseError.message)
               }));
@@ -102,21 +102,19 @@ async function execute(monitoringConfigurationFilter, sender, onSuccess, onFailu
     await Promise.all(tests)
                  .then(onSuccess(startTime))
                  .catch(onFailure(startTime))
-};
+}
 
 
 /**
  * executes the test configured by a monitoring configuration, sends the generated telemetry and events
- * returns a promise fullfilled when the thest is ran (any outcome), rejected when the execution fails
- * @param {monitoringConfiguration} monitoringConfiguration
- * @param {TelemetryClient} telemetryClient
- * @param {*} sslClient
- * @param {axios} httpClient axios client
- * @returns promise rejected in case of a test EXECUTION failure
+ * returns a promise fulfilled when the test is ran (any outcome), rejected when the execution fails
+ * @param {monitoringConfiguration} monitoringConfiguration the monitoring configuration object
+ * @param {axios} httpClient axios client instance
+ * @param {*} sender telemetry sender function
+ * @returns {Promise} promise fulfilled when test completes, rejected in case of execution failure
  */
 async function testIt(monitoringConfiguration, httpClient, sender){
-  console.log(`preparing test for ${JSON.stringify(monitoringConfiguration)}`)
-
+  logger.info(`preparing test for ${JSON.stringify(monitoringConfiguration)}`)
   let metricObjects =  statics.initMetricObjects(monitoringConfiguration);
 
   let metricContex = {
@@ -137,7 +135,5 @@ async function testIt(monitoringConfiguration, httpClient, sender){
 
   return utils.checkApi(metricContex, httpClient)
     .then(sender)
-
-
 }
 

@@ -458,3 +458,146 @@ describe('checkApi tests', () => {
 
 
 })
+
+
+describe('resultCollectorSender tests', () => {
+    test('returns the metricContext unchanged', () => {
+        const result = utils.resultCollectorSender(dummyMetricContex);
+        expect(result).toBe(dummyMetricContex);
+    });
+})
+
+
+describe('queueOnSuccess tests', () => {
+    const messageId = 'test-message-id';
+    const popReceipt = 'test-pop-receipt';
+    const alarmId = 'test-alarm-id';
+    let requestQueueClient;
+    let responseQueueClient;
+
+    beforeEach(() => {
+        requestQueueClient = { deleteMessage: jest.fn().mockResolvedValue({}) };
+        responseQueueClient = { sendMessage: jest.fn().mockResolvedValue({}) };
+    });
+
+    test('calls responseQueueClient.sendMessage once', async () => {
+        await utils.queueOnSuccess(requestQueueClient, responseQueueClient, messageId, popReceipt, alarmId)(Date.now())([dummyMetricContex]);
+        expect(responseQueueClient.sendMessage).toHaveBeenCalledTimes(1);
+    });
+
+    test('calls requestQueueClient.deleteMessage with correct messageId and popReceipt', async () => {
+        await utils.queueOnSuccess(requestQueueClient, responseQueueClient, messageId, popReceipt, alarmId)(Date.now())([dummyMetricContex]);
+        expect(requestQueueClient.deleteMessage).toHaveBeenCalledWith(messageId, popReceipt);
+    });
+
+    test('sends correctly mapped result payload to responseQueueClient', async () => {
+        await utils.queueOnSuccess(requestQueueClient, responseQueueClient, messageId, popReceipt, alarmId)(Date.now())([dummyMetricContex]);
+
+        const expectedPayload = {
+            alarmId,
+            tests: [{
+                testId: dummyMetricContex.testId,
+                appName: dummyMetricContex.monitoringConfiguration.appName,
+                apiName: dummyMetricContex.monitoringConfiguration.apiName,
+                type: dummyMetricContex.monitoringConfiguration.type,
+                apiMetrics: dummyMetricContex.apiMetrics,
+                certMetrics: dummyMetricContex.certMetrics
+            }],
+            success: true
+        };
+        expect(responseQueueClient.sendMessage).toHaveBeenCalledWith(JSON.stringify(expectedPayload));
+    });
+
+    test('sets success to true in the response message', async () => {
+        await utils.queueOnSuccess(requestQueueClient, responseQueueClient, messageId, popReceipt, alarmId)(Date.now())([]);
+        const sent = JSON.parse(responseQueueClient.sendMessage.mock.calls[0][0]);
+        expect(sent.success).toBe(true);
+    });
+
+    test('includes alarmId in the response message', async () => {
+        await utils.queueOnSuccess(requestQueueClient, responseQueueClient, messageId, popReceipt, alarmId)(Date.now())([]);
+        const sent = JSON.parse(responseQueueClient.sendMessage.mock.calls[0][0]);
+        expect(sent.alarmId).toBe(alarmId);
+    });
+
+    test('handles empty results array', async () => {
+        await utils.queueOnSuccess(requestQueueClient, responseQueueClient, messageId, popReceipt, alarmId)(Date.now())([]);
+        const sent = JSON.parse(responseQueueClient.sendMessage.mock.calls[0][0]);
+        expect(sent.tests).toHaveLength(0);
+    });
+
+    test('handles null results by treating them as an empty array', async () => {
+        await utils.queueOnSuccess(requestQueueClient, responseQueueClient, messageId, popReceipt, alarmId)(Date.now())(null);
+        const sent = JSON.parse(responseQueueClient.sendMessage.mock.calls[0][0]);
+        expect(sent.tests).toHaveLength(0);
+    });
+
+    test('filters out null entries from results', async () => {
+        const results = [dummyMetricContex, null, dummyMetricContex];
+        await utils.queueOnSuccess(requestQueueClient, responseQueueClient, messageId, popReceipt, alarmId)(Date.now())(results);
+        const sent = JSON.parse(responseQueueClient.sendMessage.mock.calls[0][0]);
+        expect(sent.tests).toHaveLength(2);
+    });
+
+    test('maps multiple results correctly', async () => {
+        const results = [
+            { ...dummyMetricContex, testId: 'test-1' },
+            { ...dummyMetricContex, testId: 'test-2' }
+        ];
+        await utils.queueOnSuccess(requestQueueClient, responseQueueClient, messageId, popReceipt, alarmId)(Date.now())(results);
+        const sent = JSON.parse(responseQueueClient.sendMessage.mock.calls[0][0]);
+        expect(sent.tests).toHaveLength(2);
+        expect(sent.tests[0].testId).toBe('test-1');
+        expect(sent.tests[1].testId).toBe('test-2');
+    });
+})
+
+
+describe('queueOnError tests', () => {
+    const messageId = 'test-message-id';
+    const popReceipt = 'test-pop-receipt';
+    const alarmId = 'test-alarm-id';
+    let requestQueueClient;
+    let responseQueueClient;
+
+    beforeEach(() => {
+        requestQueueClient = { deleteMessage: jest.fn().mockResolvedValue({}) };
+        responseQueueClient = { sendMessage: jest.fn().mockResolvedValue({}) };
+    });
+
+    test('calls responseQueueClient.sendMessage once', async () => {
+        await utils.queueOnError(requestQueueClient, responseQueueClient, messageId, popReceipt, alarmId)(Date.now())(new Error('boom'));
+        expect(responseQueueClient.sendMessage).toHaveBeenCalledTimes(1);
+    });
+
+    test('calls requestQueueClient.deleteMessage with correct messageId and popReceipt', async () => {
+        await utils.queueOnError(requestQueueClient, responseQueueClient, messageId, popReceipt, alarmId)(Date.now())(new Error('boom'));
+        expect(requestQueueClient.deleteMessage).toHaveBeenCalledWith(messageId, popReceipt);
+    });
+
+    test('sends success: false in the response message', async () => {
+        await utils.queueOnError(requestQueueClient, responseQueueClient, messageId, popReceipt, alarmId)(Date.now())(new Error('boom'));
+        const sent = JSON.parse(responseQueueClient.sendMessage.mock.calls[0][0]);
+        expect(sent.success).toBe(false);
+    });
+
+    test('sends an empty tests array in the response message', async () => {
+        await utils.queueOnError(requestQueueClient, responseQueueClient, messageId, popReceipt, alarmId)(Date.now())(new Error('boom'));
+        const sent = JSON.parse(responseQueueClient.sendMessage.mock.calls[0][0]);
+        expect(sent.tests).toEqual([]);
+    });
+
+    test('includes alarmId in the response message', async () => {
+        await utils.queueOnError(requestQueueClient, responseQueueClient, messageId, popReceipt, alarmId)(Date.now())(new Error('boom'));
+        const sent = JSON.parse(responseQueueClient.sendMessage.mock.calls[0][0]);
+        expect(sent.alarmId).toBe(alarmId);
+    });
+
+    test('sends the correct payload regardless of error type', async () => {
+        const expectedPayload = { alarmId, tests: [], success: false };
+        await utils.queueOnError(requestQueueClient, responseQueueClient, messageId, popReceipt, alarmId)(Date.now())('string error');
+        expect(responseQueueClient.sendMessage).toHaveBeenCalledWith(JSON.stringify(expectedPayload));
+    });
+})
+
+

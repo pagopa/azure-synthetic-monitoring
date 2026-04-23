@@ -1,5 +1,6 @@
 // modules
 const utils = require('./utils')
+const logger = require('./logger')
 
 const tester = require('./synthetic-monitoring')
 const appInsights = require("applicationinsights");
@@ -26,27 +27,32 @@ const failedMonitoringEvent = {
 }
 
 
+module.exports = {
+  execute
+}
 
 
-async function main() {
+/**
+ * Executes the synthetic monitoring function.
+ * Runs all monitoring tests (using a keep-all filter), sends telemetry events to Application Insights,
+ * and tracks availability metrics based on test results.
+ * @async
+ * @returns {Promise<void>}
+ */
+async function execute() {
    // call tester with a "keep all" filter
-   await tester.execute(
-     (monConfig) => true,
+   await tester.runMonitoring(
+     filterKeepAll,
      utils.eventAndTelemetrySender(telemetryClient),
-     onTestSuccess,
-     onTestFailure
+     utils.cronOnSuccess,
+     utils.cronOnError
    );
-};
-
-
-function onTestSuccess(startTime){
-  return (result) => {utils.trackSelfAvailabilityEvent(successMonitoringEvent, startTime, telemetryClient, "ok"); console.log("SUCCESS")}
-}
-
-function onTestFailure(startTime){
-  return (error) => {utils.trackSelfAvailabilityEvent(failedMonitoringEvent, startTime, telemetryClient, error); console.error(`FAILURE: ${error}`)}
 }
 
 
-//start process
-main()
+function filterKeepAll (monitoringConfiguration) {
+  return true;
+}
+
+
+
