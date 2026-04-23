@@ -44,8 +44,8 @@ async function execute() {
    await tester.runMonitoring(
      filterKeepAll,
      utils.eventAndTelemetrySender(telemetryClient),
-     utils.cronOnSuccess,
-     utils.cronOnError
+     utils.cronOnSuccess(telemetryClient, successMonitoringEvent),
+     utils.cronOnError(telemetryClient, failedMonitoringEvent)
    );
 }
 

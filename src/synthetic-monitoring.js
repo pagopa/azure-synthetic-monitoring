@@ -34,7 +34,7 @@ module.exports = {
 //prepare axios interceptors
 axios.interceptors.response.use(function (response) {
     //adding tls version to response
-    response[constants.TLS_VERSION_KEY] = response.request.res.socket.getProtocol()
+    response[constants.TLS_VERSION_KEY] = response.request.res.socket?.getProtocol() || null
     response[constants.RESPONSE_TIME_KEY] = Date.now() - response.config.headers[constants.START_TIMESTAMP_KEY]
     return response;
   }, function (error) {

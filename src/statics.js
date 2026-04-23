@@ -108,7 +108,7 @@ function apiResponseElaborator(metricContext){
             if(serverCert) {
                 metricContext = readCert(metricContext, serverCert)
             } else {
-                metricContext = readCertError(metricContext, {message: error})
+                metricContext = readCertError(metricContext, {message: 'cert not found'})
 
             }
         }
@@ -155,7 +155,7 @@ function apiResponseElaborator(metricContext){
 
 
 async function getCert(metricContext, response, tlsClient){
-    let serverCert = response.request.res.socket.getPeerCertificate(false);
+    let serverCert = response.request.res.socket?.getPeerCertificate(false) || null;
     logger.info(`cert from response for ${metricContext.testId}: ${JSON.stringify(serverCert)}`)
     if (serverCert) {
         return serverCert

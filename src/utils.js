@@ -211,26 +211,32 @@ function queueOnError(requestQueueClient, responseQueueClient, messageId, popRec
 /**
  * Factory for an onSuccess handler that tracks a successful test execution.
  * Sends a self-availability event to Application Insights and logs the success.
- * @param {number} startTime The timestamp when the test started
- * @returns {function} (result) => void A function that accepts the test result
+ * @param {TelemetryClient} telemetryClient Application Insights telemetry client
+ * @param {object} event The base telemetry event data
+ * @returns {function} (startTime) => (result) => void A curried function that accepts startTime and returns a function that accepts the test result
  */
-function cronOnSuccess(startTime){
-  return (result) => {
-    trackSelfAvailabilityEvent(successMonitoringEvent, startTime, telemetryClient, "ok");
-    logger.info("SUCCESS")
+function cronOnSuccess(telemetryClient, event) {
+  return function (startTime) {
+    return (result) => {
+      trackSelfAvailabilityEvent(event, startTime, telemetryClient, "ok");
+      logger.info("SUCCESS")
+    }
   }
 }
 
 /**
  * Factory for an onError handler that tracks a failed test execution.
  * Sends a failed availability event to Application Insights and logs the error details.
- * @param {number} startTime The timestamp when the test started
- * @returns {function} (error) => void A function that accepts the error information
+ * @param {TelemetryClient} telemetryClient Application Insights telemetry client
+ * @param {object} event The base telemetry event data
+ * @returns {function} (startTime) => (error) => void A curried function that accepts startTime and returns a function that accepts the error information
  */
-function cronOnError(startTime){
-  return (error) => {
-    trackSelfAvailabilityEvent(failedMonitoringEvent, startTime, telemetryClient, error);
-    logger.error(`FAILURE: ${error}`)
+function cronOnError(telemetryClient, event) {
+  return function (startTime) {
+    return (error) => {
+      trackSelfAvailabilityEvent(event, startTime, telemetryClient, error);
+      logger.error(`FAILURE: ${error}`)
+    }
   }
 }
 

@@ -9,13 +9,13 @@ const CRON_OPERATION_MODE = "cron";
 const QUEUE_OPERATION_MODE = "queue"
 
 module.exports = {
-    keysForTelemetry,
-    keysForEvent,
-    keysForEventProperties,
-    TLS_VERSION_KEY,
-    START_TIMESTAMP_KEY,
-    RESPONSE_TIME_KEY,
-    DEFAULT_OPERATION_MODE,
-    CRON_OPERATION_MODE,
-    QUEUE_OPERATION_MODE
+  keysForTelemetry,
+  keysForEvent,
+  keysForEventProperties,
+  TLS_VERSION_KEY,
+  START_TIMESTAMP_KEY,
+  RESPONSE_TIME_KEY,
+  DEFAULT_OPERATION_MODE,
+  CRON_OPERATION_MODE,
+  QUEUE_OPERATION_MODE,
 }
