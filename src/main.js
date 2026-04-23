@@ -12,15 +12,21 @@ async function main() {
   switch (operationMode) {
     case constants.QUEUE_OPERATION_MODE:
       logger.debug(`Running queue executor`)
-      return queueExecutor.execute();
+      return await queueExecutor.execute();
     case constants.CRON_OPERATION_MODE:
       logger.debug(`Running cron executor`)
-      return cronExecutor.execute();
+      return await cronExecutor.execute();
     default:
       logger.error(`Unknown operation mode: ${operationMode}, running cron executor`);
-      return cronExecutor.execute();
+      return await cronExecutor.execute();
   }
 }
 
 //start process
 main()
+  .then(() => {
+    process.exit(0);
+  })
+  .catch((error) => {
+    process.exit(1);
+  });
