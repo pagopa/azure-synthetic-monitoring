@@ -164,7 +164,7 @@ async function getCert(metricContext, response, tlsClient){
         try{
             serverCert = await getCertWithTls(metricContext, tlsClient)
         } catch(error) {
-            logger.error(`failed to load server cert for ${metricContext.testId}`)
+            logger.error(`failed to load server cert for ${metricContext.testId}, ${error}`)
             serverCert = null
         }
         return serverCert
@@ -176,8 +176,8 @@ async function getCertWithTls(metricContext, tlsClient){
         let parsedUrl = new URL(metricContext.monitoringConfiguration.url)
         const options = {
             host: parsedUrl.host,
-            port: parsedUrl.port || parsedUrl.protocol.includes('https') ? 443 : 80,
-            servername: metricContext.monitoringConfiguration.headers["Host"] || parsedUrl.hostname,
+            port: parsedUrl.port || (parsedUrl.protocol.includes('https') ? 443 : 80),
+            servername: metricContext.monitoringConfiguration.headers?.["Host"] || parsedUrl.hostname,
             rejectUnauthorized: true
         };
         const socket = tlsClient.connect(options, () => {
