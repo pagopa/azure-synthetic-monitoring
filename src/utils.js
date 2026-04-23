@@ -216,7 +216,7 @@ function queueOnError(requestQueueClient, responseQueueClient, messageId, popRec
  */
 function cronOnSuccess(startTime){
   return (result) => {
-    utils.trackSelfAvailabilityEvent(successMonitoringEvent, startTime, telemetryClient, "ok");
+    trackSelfAvailabilityEvent(successMonitoringEvent, startTime, telemetryClient, "ok");
     logger.info("SUCCESS")
   }
 }
@@ -229,7 +229,7 @@ function cronOnSuccess(startTime){
  */
 function cronOnError(startTime){
   return (error) => {
-    utils.trackSelfAvailabilityEvent(failedMonitoringEvent, startTime, telemetryClient, error);
+    trackSelfAvailabilityEvent(failedMonitoringEvent, startTime, telemetryClient, error);
     logger.error(`FAILURE: ${error}`)
   }
 }
