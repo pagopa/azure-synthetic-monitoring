@@ -175,8 +175,13 @@ function queueOnSuccess(requestQueueClient, responseQueueClient, messageId, popR
               success: true
             }
 
-            await responseQueueClient.sendMessage(JSON.stringify(testResults)).then((result) => requestQueueClient.deleteMessage(messageId, popReceipt));
-            logger.info(`SUCCESS for alarmId ${alarmId}: sent ${payload.length} results to response queue`);
+            await responseQueueClient.sendMessage(JSON.stringify(testResults))
+              .then((result) => {
+                logger.info(`SUCCESS for alarmId ${alarmId}: sent ${payload.length} results to response queue`);
+                return requestQueueClient.deleteMessage(messageId, popReceipt)
+              })
+              .then((result) => logger.info(`Removed message for alarmId ${alarmId}`))
+
         }
     }
 }
