@@ -174,7 +174,8 @@ function queueOnSuccess(requestQueueClient, responseQueueClient, messageId, popR
               tests: payload,
               success: true
             }
-            await responseQueueClient.sendMessage(JSON.stringify(testResults)).then(requestQueueClient.deleteMessage(messageId, popReceipt));
+
+            await responseQueueClient.sendMessage(JSON.stringify(testResults)).then((result) => requestQueueClient.deleteMessage(messageId, popReceipt));
             logger.info(`SUCCESS for alarmId ${alarmId}: sent ${payload.length} results to response queue`);
         }
     }
