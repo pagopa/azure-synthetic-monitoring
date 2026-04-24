@@ -7,7 +7,19 @@ const appInsights = require("applicationinsights");
 const process = require("process");
 const availabilityPrefix = process.env.AVAILABILITY_PREFIX
 const location = process.env.LOCATION
-const telemetryClient = new appInsights.TelemetryClient(process.env.APP_INSIGHT_CONNECTION_STRING);
+
+let telemetryClient;
+try {
+  const aiSetup = appInsights.setup(process.env.APP_INSIGHT_CONNECTION_STRING);
+  if (aiSetup) {
+    aiSetup.start();
+    telemetryClient = new appInsights.TelemetryClient(process.env.APP_INSIGHT_CONNECTION_STRING);
+    logger.debug("Application Insights client initialized successfully");
+  }
+} catch (error) {
+  logger.error(`Failed to initialize Application Insights: ${error.message}`);
+  throw error;
+}
 
 //constants
 const successMonitoringEvent = {

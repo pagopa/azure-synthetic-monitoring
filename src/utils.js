@@ -175,13 +175,9 @@ function queueOnSuccess(requestQueueClient, responseQueueClient, messageId, popR
               success: true
             }
 
-            await responseQueueClient.sendMessage(JSON.stringify(testResults))
-              .then((result) => {
-                logger.info(`SUCCESS for alarmId ${alarmId}: sent ${payload.length} results to response queue`);
-                return requestQueueClient.deleteMessage(messageId, popReceipt)
-              })
-              .then((result) => logger.info(`Removed message for alarmId ${alarmId}`))
-
+            await responseQueueClient.sendMessage(JSON.stringify(testResults));
+            await requestQueueClient.deleteMessage(messageId, popReceipt);
+            logger.info(`SUCCESS for alarmId ${alarmId}: sent ${payload.length} results to response queue`);
         }
     }
 }
@@ -208,7 +204,8 @@ function queueOnError(requestQueueClient, responseQueueClient, messageId, popRec
         tests: [],
         success: false
       }
-      await responseQueueClient.sendMessage(JSON.stringify(testResults)).then(requestQueueClient.deleteMessage(messageId, popReceipt));
+      await responseQueueClient.sendMessage(JSON.stringify(testResults));
+      await requestQueueClient.deleteMessage(messageId, popReceipt);
       logger.error(`FAILURE for alarm ${alarmId}: ${error}. sent error results to response queue`);
     }
   }

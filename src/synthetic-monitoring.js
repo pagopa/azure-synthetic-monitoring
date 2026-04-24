@@ -19,11 +19,26 @@ const availabilityPrefix = process.env.AVAILABILITY_PREFIX
 const httpClientTimeout = process.env.HTTP_CLIENT_TIMEOUT
 const certValidityRangeDays = process.env.CERT_VALIDITY_RANGE_DAYS
 
-appInsights.setup(process.env.APP_INSIGHT_CONNECTION_STRING).start();
+try {
+  const aiSetup = appInsights.setup(process.env.APP_INSIGHT_CONNECTION_STRING);
+  if (aiSetup) {
+    aiSetup.start();
+    logger.debug("Application Insights initialized successfully");
+  }
+} catch (error) {
+  logger.error(`Failed to initialize Application Insights: ${error.message}`);
+}
 
 //clients
-const credential = new AzureNamedKeyCredential(account, accountKey);
-const tableClient = new TableClient(`https://${account}.table.core.windows.net`, tableName, credential);
+let tableClient;
+try {
+  const credential = new AzureNamedKeyCredential(account, accountKey);
+  tableClient = new TableClient(`https://${account}.table.core.windows.net`, tableName, credential);
+  logger.debug("Table client initialized successfully");
+} catch (error) {
+  logger.error(`Failed to initialize Table client: ${error.message}`);
+  throw error;
+}
 
 
 
