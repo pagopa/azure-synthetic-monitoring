@@ -175,7 +175,7 @@ function queueOnSuccess(requestQueueClient, responseQueueClient, messageId, popR
               success: true
             }
             await responseQueueClient.sendMessage(JSON.stringify(testResults)).then(requestQueueClient.deleteMessage(messageId, popReceipt));
-            logger.info(`SUCCESS queueResultsSender: sent ${payload.length} results to response queue`);
+            logger.info(`SUCCESS for alarmId ${alarmId}: sent ${payload.length} results to response queue`);
         }
     }
 }
@@ -203,7 +203,7 @@ function queueOnError(requestQueueClient, responseQueueClient, messageId, popRec
         success: false
       }
       await responseQueueClient.sendMessage(JSON.stringify(testResults)).then(requestQueueClient.deleteMessage(messageId, popReceipt));
-      logger.error(`FAILURE queueOnError: ${error}. sent error results to response queue`);
+      logger.error(`FAILURE for alarm ${alarmId}: ${error}. sent error results to response queue`);
     }
   }
 }

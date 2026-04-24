@@ -33,12 +33,14 @@ async function execute() {
     return;
   }
 
-  const receivedMessage = messages.receivedMessageItems[0];
+  logger.info(`Received ${messages.receivedMessageItems.length} message(s) from the queue`);
 
+  for (const receivedMessage of messages.receivedMessageItems) {
     const messageId = receivedMessage.messageId;
     const popReceipt = receivedMessage.popReceipt;
     const body = JSON.parse(receivedMessage.messageText);
     const alarmId = body.alarmId;
+    logger.info(`Processing message ${JSON.stringify(body)} from the queue`);
 
     await tester.runMonitoring(
       statics.monitorConfigurationFilterByName(body.appNames),
@@ -46,6 +48,7 @@ async function execute() {
       utils.queueOnSuccess(requestQueueClient, responseQueueClient, messageId, popReceipt, alarmId),
       utils.queueOnError(requestQueueClient, responseQueueClient, messageId, popReceipt, alarmId)
     );
+  }
 
 }
 
