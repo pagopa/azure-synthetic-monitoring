@@ -26,7 +26,7 @@ module.exports = {
 async function execute() {
   const requestQueueClient = new QueueClient(process.env.STORAGE_ACCOUNT_CONNECTION_STRING, process.env.INBOUND_QUEUE_NAME);
   const responseQueueClient = new QueueClient(process.env.STORAGE_ACCOUNT_CONNECTION_STRING, process.env.OUTBOUND_QUEUE_NAME);
-  const messages = await requestQueueClient.receiveMessages({ numberOfMessages: process.env.QUEUE_BATCH_SIZE || 1 });
+  const messages = await requestQueueClient.receiveMessages({ numberOfMessages: parseInt(process.env.QUEUE_BATCH_SIZE || 1) });
 
   if (messages.receivedMessageItems.length === 0) {
     logger.info('No messages to process');
