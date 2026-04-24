@@ -1,14 +1,12 @@
 // modules
 const logger = require('./logger')
 const constants = require('./const')
-const { validateEnvironment } = require('./env-validator')
 const queueExecutor = require('./queue-executor')
 const cronExecutor = require('./cron-executor')
 
 
 
 async function main() {
-  //validateEnvironment();
 
   const operationMode = process.env.OPERATION_MODE || constants.DEFAULT_OPERATION_MODE
 

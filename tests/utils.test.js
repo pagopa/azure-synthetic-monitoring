@@ -601,3 +601,178 @@ describe('queueOnError tests', () => {
 })
 
 
+describe('logSender tests', () => {
+    test('logSender logs the metric context', () => {
+        const logger = require('../src/logger');
+        const logSpy = jest.spyOn(logger, 'info').mockImplementation();
+        
+        utils.logSender(dummyMetricContex);
+        
+        expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('logSender'));
+        logSpy.mockRestore();
+    });
+})
+
+
+describe('logSuccess tests', () => {
+    test('returns a function', () => {
+        const result = utils.logSuccess(Date.now());
+        expect(typeof result).toBe('function');
+    });
+
+    test('calls logger.info when invoked', () => {
+        const logger = require('../src/logger');
+        const logSpy = jest.spyOn(logger, 'info').mockImplementation();
+        
+        const handler = utils.logSuccess(Date.now());
+        handler('test result');
+        
+        expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('logSuccess'));
+        logSpy.mockRestore();
+    });
+})
+
+
+describe('logError tests', () => {
+    test('returns a function', () => {
+        const result = utils.logError(Date.now());
+        expect(typeof result).toBe('function');
+    });
+
+    test('calls logger.error when invoked', () => {
+        const logger = require('../src/logger');
+        const errorSpy = jest.spyOn(logger, 'error').mockImplementation();
+        
+        const handler = utils.logError(Date.now());
+        handler('test error');
+        
+        expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('FAILURE'));
+        errorSpy.mockRestore();
+    });
+})
+
+
+describe('eventAndTelemetrySender tests', () => {
+    test('returns an async function', () => {
+        const handler = utils.eventAndTelemetrySender(dummyTelemetryClient);
+        expect(typeof handler).toBe('function');
+    });
+
+    test('passes context from eventSender to telemetrySender', async () => {
+        dummyMetricContex.apiMetrics = {
+            'duration': 100,
+            'targetStatus': 1,
+            'httpStatus': 200,
+        };
+
+        const handler = utils.eventAndTelemetrySender(dummyTelemetryClient);
+        const result = await handler(dummyMetricContex);
+        
+        expect(result).toMatchObject(dummyMetricContex);
+        expect(trackEvent).toHaveBeenCalled();
+        expect(trackAvailability).toHaveBeenCalled();
+    });
+
+    test('sends both event and telemetry data', async () => {
+        dummyMetricContex.apiMetrics = {
+            'duration': 100,
+            'targetStatus': 1,
+            'httpStatus': 200,
+            'targetTlsVersion': 1.3
+        };
+
+        const handler = utils.eventAndTelemetrySender(dummyTelemetryClient);
+        await handler(dummyMetricContex);
+        
+        // Check that both trackEvent and trackAvailability were called
+        expect(trackEvent).toHaveBeenCalled();
+        expect(trackAvailability).toHaveBeenCalled();
+    });
+})
+
+
+describe('cronOnSuccess tests', () => {
+    test('returns a curried function', () => {
+        const handler = utils.cronOnSuccess(dummyTelemetryClient, {});
+        expect(typeof handler).toBe('function');
+        
+        const innerHandler = handler(Date.now());
+        expect(typeof innerHandler).toBe('function');
+    });
+
+    test('calls trackAvailability on success', () => {
+        const mockEvent = {
+            id: 'test',
+            message: '',
+            success: true,
+            name: 'test'
+        };
+        
+        const handler = utils.cronOnSuccess(dummyTelemetryClient, mockEvent);
+        const startTime = Date.now();
+        const innerHandler = handler(startTime);
+        
+        innerHandler('ok');
+        
+        expect(trackAvailability).toHaveBeenCalled();
+    });
+
+    test('sends ok message', () => {
+        const mockEvent = {
+            id: 'test',
+            message: '',
+            success: true,
+            name: 'test'
+        };
+        
+        const handler = utils.cronOnSuccess(dummyTelemetryClient, mockEvent);
+        handler(Date.now())('result');
+        
+        expect(trackAvailability).toHaveBeenCalledWith(
+            expect.objectContaining({ message: 'ok' })
+        );
+    });
+})
+
+
+describe('cronOnError tests', () => {
+    test('returns a curried function', () => {
+        const handler = utils.cronOnError(dummyTelemetryClient, {});
+        expect(typeof handler).toBe('function');
+        
+        const innerHandler = handler(Date.now());
+        expect(typeof innerHandler).toBe('function');
+    });
+
+    test('calls trackAvailability on error', () => {
+        const mockEvent = {
+            id: 'test',
+            message: '',
+            success: false,
+            name: 'test'
+        };
+        
+        const handler = utils.cronOnError(dummyTelemetryClient, mockEvent);
+        handler(Date.now())('error message');
+        
+        expect(trackAvailability).toHaveBeenCalled();
+    });
+
+    test('sends error message', () => {
+        const mockEvent = {
+            id: 'test',
+            message: '',
+            success: false,
+            name: 'test'
+        };
+        
+        const handler = utils.cronOnError(dummyTelemetryClient, mockEvent);
+        handler(Date.now())('test error');
+        
+        expect(trackAvailability).toHaveBeenCalledWith(
+            expect.objectContaining({ message: 'test error' })
+        );
+    });
+})
+
+
