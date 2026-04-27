@@ -385,7 +385,8 @@ describe('checkApi tests', () => {
 
 
      test('enrich context with cert data when response ok and checkCert true', () => {
-        let dummyHttpResponse = {
+       let validTo = datePlusDays(10)
+       let dummyHttpResponse = {
             status : 200,
             RESPONSE_TIME: 1234,
             statusText: "ok",
@@ -394,7 +395,7 @@ describe('checkApi tests', () => {
                 res: {
                     socket: {
                         getPeerCertificate: function (booleanValue){
-                            return {valid_to: 1644534000000}
+                            return {valid_to: validTo.getTime()}
                         }
                     }
                 }
@@ -411,7 +412,7 @@ describe('checkApi tests', () => {
               success:true,
               certSuccess:1,
               targetExpireInDays:10,
-              targetExpirationTimestamp: 1644534000000,
+              targetExpirationTimestamp: validTo.getTime(),
               runLocation:"private-cert"
             },
 
