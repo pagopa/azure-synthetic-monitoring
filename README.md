@@ -57,13 +57,13 @@ Set `OPERATION_MODE=queue`.
 }
 ```
 
-| Field     | Type    | Description                                                             |
-|-----------|---------|-------------------------------------------------------------------------|
-| `alarmId` | string  | The alarm ID from the inbound message                                   |
-| `tests`   | array   | One entry per monitoring test that was executed                         |
-| `success` | boolean | `true` when all tests executed without errors, `false` on failure       |
+| Field     | Type    | Description                                                               |
+|-----------|---------|---------------------------------------------------------------------------|
+| `alarmId` | string  | The alarm ID from the inbound message                                     |
+| `tests`   | array   | One entry per monitoring test that was executed                           |
+| `success` | boolean | `true` when test execution has completed successfully, `false` on failure |
 
-If any error occurs during test execution, the outbound message will contain `"tests": []` and `"success": false`.
+**N.B.:** `success` field indicates whether the tests were executed successfully, not the result of the availability checks. Each entry in the `tests` array contains the results of an individual test, including both API and certificate metrics (if applicable).
 
 
 ## Configuration
@@ -148,6 +148,7 @@ When checking the certificate, the suffix `-cert` will be appended to the "runLo
 | `STORAGE_ACCOUNT_CONNECTION_STRING` | storage account connection string. used by the queue client in queue mode                           | queue mode only     | -         |
 | `INBOUND_QUEUE_NAME`              | name of the Azure Storage Queue from which monitoring requests are read                               | queue mode only     | -         |
 | `OUTBOUND_QUEUE_NAME`             | name of the Azure Storage Queue to which monitoring results are written                               | queue mode only     | -         |
+| `QUEUE_BATCH_SIZE`                | number of messages to retrieve from the inbound queue in each execution                                | queue mode only     | `1`       |
 | `OPERATION_MODE`                  | execution mode. accepted values: `cron`, `queue`                                                      | no                  | `cron`    |
 | `AVAILABILITY_PREFIX`             | prefix used in the custom metric and events names                                                     | no                  | synthetic |
 | `HTTP_CLIENT_TIMEOUT`             | response timeout used by the http client performing the availability requests                         | yes                 | -         |

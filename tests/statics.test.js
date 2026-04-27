@@ -568,33 +568,84 @@ describe('initMetricObjects tests', () => {
 
 describe('getCert tests', () => {
 
-  test('returns cert when found in response', () => {
-    let validTo = new Date();
-    validTo.setDate(validTo.getDate() + 9);
-    let mockCertResponse = {valid_to: validTo}
+   test('returns cert when found in response', () => {
+     let validTo = new Date();
+     validTo.setDate(validTo.getDate() + 9);
+     let mockCertResponse = {valid_to: validTo}
 
-    let mockApiResponse = {
-      request: {
-        res: {
-          socket: {
-            getPeerCertificate: function(bool){
-              return mockCertResponse
-            }
-          }
-        }
-      }
-    }
-    let mockTlsClient = {
-      connect : function(){}
-    }
-    let jestMockTlsClient = jest.spyOn(mockTlsClient, 'connect')
-    statics.getCert(dummyMetricContex, mockApiResponse, jestMockTlsClient).then(data =>{
-      expect(data).toMatchObject(mockCertResponse);
+     let mockApiResponse = {
+       request: {
+         res: {
+           socket: {
+             getPeerCertificate: function(bool){
+               return mockCertResponse
+             }
+           }
+         }
+       }
+     }
+     let mockTlsClient = {
+       connect : function(){}
+     }
+     let jestMockTlsClient = jest.spyOn(mockTlsClient, 'connect')
+     statics.getCert(dummyMetricContex, mockApiResponse, jestMockTlsClient).then(data =>{
+       expect(data).toMatchObject(mockCertResponse);
 
-      expect(jestMockTlsClient).not.toHaveBeenCalled()
-    })
+       expect(jestMockTlsClient).not.toHaveBeenCalled()
+     })
 
-  });
+   });
+
+   test('falls back to getCertWithTls when cert not found in response socket', () => {
+     let validTo = new Date();
+     validTo.setDate(validTo.getDate() + 9);
+     let mockCertFromTls = {valid_to: validTo}
+
+     let mockApiResponse = {
+       request: {
+         res: {
+           socket: {
+             getPeerCertificate: function(bool){
+               return null
+             }
+           }
+         }
+       }
+     }
+
+     let mockSocket = {
+       getPeerCertificate: function(){
+         return mockCertFromTls
+       },
+       end: function(){},
+       on: function(event, callback){
+         // Mock error handler - do nothing in this test
+       }
+     }
+
+     let callbackHolder;
+     let mockTlsClient = {
+       connect : function(options, callback){
+         // Store the callback to call it on next tick
+         callbackHolder = callback;
+         return mockSocket;
+       }
+     }
+
+     // Manually call the callback asynchronously after setup
+     const promise = statics.getCert(dummyMetricContex, mockApiResponse, mockTlsClient);
+
+     // Call the callback on next tick
+     Promise.resolve().then(() => {
+       if (callbackHolder) {
+         callbackHolder();
+       }
+     });
+
+     return promise.then(data =>{
+       expect(data).toMatchObject(mockCertFromTls);
+     })
+   });
 
 })
 
