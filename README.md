@@ -1,9 +1,70 @@
 # Azure Synthetic Monitoring
 
-Azure function to monitor internal and external service status, reporting to Application Insight in the following formats:
+Azure function to monitor internal and external service status. It supports two operation modes:
+
+- **cron** (default): runs all configured monitoring tests on a schedule and reports results to Application Insights
+- **queue**: triggered by a message on an Azure Storage Queue, runs tests filtered by app name, and writes results back to a response queue
+
+When running in cron mode, results are reported to Application Insights in the following formats:
 
 - availability events, named `<prefix>-<app_name>-<api_name>` further distinguished by the `type` defined in the configuration used as "run location" for the test
-- custom event, using the name `<prefix>-<app_name>-<api_name>-<type>`. these events are queryable ising log insight and can be visualized using Grafana
+- custom event, using the name `<prefix>-<app_name>-<api_name>-<type>`. these events are queryable using log insight and can be visualized using Grafana
+
+## Operation modes
+
+### Cron mode
+
+The default mode. Runs all monitoring tests on a schedule, sending availability metrics and custom events directly to Application Insights.
+
+Set `OPERATION_MODE=cron` (or omit the variable, as `cron` is the default).
+
+### Queue mode
+
+Designed to be triggered by an external alarm system. The application reads one message at a time from the inbound Azure Storage Queue, runs monitoring tests for the apps listed in the message, and writes the results to the outbound queue.
+
+Set `OPERATION_MODE=queue`.
+
+**Inbound message format:**
+
+```json
+{
+  "alarmId": "unique-alarm-identifier",
+  "appNames": ["appName1", "appName2"]
+}
+```
+
+| Field      | Type            | Description                                                              |
+|------------|-----------------|--------------------------------------------------------------------------|
+| `alarmId`  | string          | Identifier of the alarm that triggered the check. Echoed in the response |
+| `appNames` | array of string | List of `appName` values to test (matched against the table configuration) |
+
+**Outbound message format:**
+
+```json
+{
+  "alarmId": "unique-alarm-identifier",
+  "tests": [
+    {
+      "testId": "appName_apiName_type",
+      "appName": "appName",
+      "apiName": "apiName",
+      "type": "private",
+      "apiMetrics": {},
+      "certMetrics": {}
+    }
+  ],
+  "success": true
+}
+```
+
+| Field     | Type    | Description                                                               |
+|-----------|---------|---------------------------------------------------------------------------|
+| `alarmId` | string  | The alarm ID from the inbound message                                     |
+| `tests`   | array   | One entry per monitoring test that was executed                           |
+| `success` | boolean | `true` when test execution has completed successfully, `false` on failure |
+
+**N.B.:** `success` field indicates whether the tests were executed successfully, not the result of the availability checks. Each entry in the `tests` array contains the results of an individual test, including both API and certificate metrics (if applicable).
+
 
 ## Configuration
 
@@ -78,18 +139,33 @@ When checking the certificate, the suffix `-cert` will be appended to the "runLo
 
 ## Env variables
 
-| name                          | description                                                                                           | required | default   |
-|-------------------------------|-------------------------------------------------------------------------------------------------------|----------|-----------|
-| APP_INSIGHT_CONNECTION_STRING | application insight connection string. where to publish availability metrics and custom events        | yes      | -         |
-| STORAGE_ACCOUNT_NAME          | storage account name used to store the monitoring configuration                                       | yes      | -         |
-| STORAGE_ACCOUNT_KEY           | storage account access key                                                                            | yes      | -         |
-| STORAGE_ACCOUNT_TABLE_NAME    | table name used to store the monitoring configuration                                                 | yes      | -         |
-| AVAILABILITY_PREFIX           | prefix used in the custom metric and events names                                                     | no       | synthetic |
-| HTTP_CLIENT_TIMEOUT           | response timeout used by the http client performing the availability requests                         | yes      | -         |
-| HTTP_CONNECTION_TIMEOUT       | connection timeout used by the http client performing the availability requests                       | yes      | -         |
-| LOCATION                      | region name where this job is run                                                                     | yes      | -         |
-| CERT_VALIDITY_RANGE_DAYS      | number of days before the expiration date of a certificate over which the check is considered success | yes      | -         |
+| name                              | description                                                                                           | required            | default   |
+|-----------------------------------|-------------------------------------------------------------------------------------------------------|---------------------|-----------|
+| `APP_INSIGHT_CONNECTION_STRING`   | application insight connection string. where to publish availability metrics and custom events        | yes                 | -         |
+| `STORAGE_ACCOUNT_NAME`            | storage account name used to store the monitoring configuration table                                 | yes                 | -         |
+| `STORAGE_ACCOUNT_KEY`             | storage account access key for the monitoring configuration table                                     | yes                 | -         |
+| `STORAGE_ACCOUNT_TABLE_NAME`      | table name used to store the monitoring configuration                                                 | yes                 | -         |
+| `STORAGE_ACCOUNT_CONNECTION_STRING` | storage account connection string. used by the queue client in queue mode                           | queue mode only     | -         |
+| `INBOUND_QUEUE_NAME`              | name of the Azure Storage Queue from which monitoring requests are read                               | queue mode only     | -         |
+| `OUTBOUND_QUEUE_NAME`             | name of the Azure Storage Queue to which monitoring results are written                               | queue mode only     | -         |
+| `QUEUE_BATCH_SIZE`                | number of messages to retrieve from the inbound queue in each execution                                | queue mode only     | `1`       |
+| `OPERATION_MODE`                  | execution mode. accepted values: `cron`, `queue`                                                      | no                  | `cron`    |
+| `AVAILABILITY_PREFIX`             | prefix used in the custom metric and events names                                                     | no                  | synthetic |
+| `HTTP_CLIENT_TIMEOUT`             | response timeout used by the http client performing the availability requests                         | yes                 | -         |
+| `LOCATION`                        | region name where this job is run                                                                     | yes                 | -         |
+| `CERT_VALIDITY_RANGE_DAYS`        | number of days before the expiration date of a certificate over which the check is considered success | yes                 | -         |
+| `LOG_LEVEL`                       | logging verbosity. accepted values: `DEBUG`, `INFO`, `ERROR`                                          | no                  | `INFO`    |
 
 ## Deploy
 
-To deploy this job you can use the module `monitoring_function` provided in [terraform-azurerm-v3](https://github.com/pagopa/terraform-azurerm-v3)
+To deploy this job you can use the module `monitoring_function` provided in [terraform-azurerm-v4](https://github.com/pagopa/terraform-azurerm-v4)
+
+
+## Local execution
+
+- Run `npm install` to install the dependencies
+- Define a local environment file `local.env` with the required env variable and run the following command in the project root:
+
+```bash
+node --env-file=local.env src/main.js
+```

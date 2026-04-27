@@ -4,12 +4,18 @@ const keysForEventProperties = ['domain', 'checkCert', 'message'];
 const TLS_VERSION_KEY = "TLS_VERSION"
 const START_TIMESTAMP_KEY = "x-request-timestamp"
 const RESPONSE_TIME_KEY = "RESPONSE_TIME"
+const DEFAULT_OPERATION_MODE = "cron"
+const CRON_OPERATION_MODE = "cron";
+const QUEUE_OPERATION_MODE = "queue"
 
 module.exports = {
-    keysForTelemetry,
-    keysForEvent,
-    keysForEventProperties,
-    TLS_VERSION_KEY,
-    START_TIMESTAMP_KEY,
-    RESPONSE_TIME_KEY
+  keysForTelemetry,
+  keysForEvent,
+  keysForEventProperties,
+  TLS_VERSION_KEY,
+  START_TIMESTAMP_KEY,
+  RESPONSE_TIME_KEY,
+  DEFAULT_OPERATION_MODE,
+  CRON_OPERATION_MODE,
+  QUEUE_OPERATION_MODE,
 }

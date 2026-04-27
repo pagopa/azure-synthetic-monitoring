@@ -39,9 +39,11 @@ jobs:
         uses: docker/build-push-action@c56af957549030174b10d6867f20e78cfd7debc5
         with:
           context: .
+          file: Dockerfile
           push: true
           tags: |
             ghcr.io/${{ github.repository }}:beta-${{ github.ref_name }}
           labels: |
             maintainer=https://pagopa.it
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
+

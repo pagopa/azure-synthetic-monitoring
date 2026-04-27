@@ -8,6 +8,7 @@ const process = require('process')
 const utils = require('./utils')
 const statics = require('./statics')
 const constants = require('./const')
+const logger = require('./logger')
 
 
 //env vars
@@ -16,42 +17,43 @@ const accountKey = process.env.STORAGE_ACCOUNT_KEY;
 const tableName = process.env.STORAGE_ACCOUNT_TABLE_NAME
 const availabilityPrefix = process.env.AVAILABILITY_PREFIX
 const httpClientTimeout = process.env.HTTP_CLIENT_TIMEOUT
-const location = process.env.LOCATION
 const certValidityRangeDays = process.env.CERT_VALIDITY_RANGE_DAYS
 
-appInsights.setup(process.env.APP_INSIGHT_CONNECTION_STRING).start();
-
-//clients
-const credential = new AzureNamedKeyCredential(account, accountKey);
-const tableClient = new TableClient(`https://${account}.table.core.windows.net`, tableName, credential);
-const client = new appInsights.TelemetryClient(process.env.APP_INSIGHT_CONNECTION_STRING);
-
-
-//constants
-const successMonitoringEvent = {
-  id: `${availabilityPrefix}-monitoring-function`,
-  message: "",
-  success : true,
-  name: `${availabilityPrefix}-monitoring-function`,
-  runLocation: location,
+try {
+  const aiSetup = appInsights.setup(process.env.APP_INSIGHT_CONNECTION_STRING);
+  if (aiSetup) {
+    aiSetup.start();
+    logger.debug("Application Insights initialized successfully");
+  }
+} catch (error) {
+  logger.error(`Failed to initialize Application Insights: ${error.message}`);
 }
 
-const failedMonitoringEvent = {
-  id: `${availabilityPrefix}-monitoring-function`,
-  message: "At least one test failed to execute",
-  success : false,
-  name: `${availabilityPrefix}-monitoring-function`,
-  runLocation: location,
+//clients
+let tableClient;
+try {
+  const credential = new AzureNamedKeyCredential(account, accountKey);
+  tableClient = new TableClient(`https://${account}.table.core.windows.net`, tableName, credential);
+  logger.debug("Table client initialized successfully");
+} catch (error) {
+  logger.error(`Failed to initialize Table client: ${error.message}`);
+  throw error;
+}
+
+
+
+module.exports = {
+  runMonitoring
 }
 
 //prepare axios interceptors
 axios.interceptors.response.use(function (response) {
     //adding tls version to response
-    response[constants.TLS_VERSION_KEY] = response.request.res.socket.getProtocol()
+    response[constants.TLS_VERSION_KEY] = response.request.res.socket?.getProtocol() || null
     response[constants.RESPONSE_TIME_KEY] = Date.now() - response.config.headers[constants.START_TIMESTAMP_KEY]
     return response;
   }, function (error) {
-    console.error(`resp error interceptor: ${JSON.stringify(error)}`)
+    logger.info(`resp error interceptor: ${JSON.stringify(error)}`)
     //nothing to do
     return Promise.reject(error);
   });
@@ -62,18 +64,18 @@ axios.interceptors.request.use(
       return config;
     },
     (error) => {
-      console.error(`req error interceptor: ${JSON.stringify(error)}`)
+      logger.info(`req error interceptor: ${JSON.stringify(error)}`)
       return Promise.reject(error);
     }
   );
 
 
-async function main() {
+async function runMonitoring(monitoringConfigurationFilter, sender, onSuccess, onFailure) {
     let tableEntities = tableClient.listEntities();
     let tests = []
     const startTime = Date.now();
     for await (const tableConfiguration of tableEntities) {
-    try{
+        try {
             //property names remap and parsing
             let nameSplit = tableConfiguration.partitionKey.split("-")
             let monitoringConfiguration = {
@@ -92,14 +94,20 @@ async function main() {
                 availabilityPrefix,
                 certValidityRangeDays
             }
-            console.log(`monitoringConfiguration: ${JSON.stringify(monitoringConfiguration)}`)
+            logger.debug(`monitoringConfiguration: ${JSON.stringify(monitoringConfiguration)}`)
 
-            tests.push(testIt(monitoringConfiguration, client, axios).catch((error) => {
-                console.error(`error in test for ${JSON.stringify(monitoringConfiguration)}: ${JSON.stringify(error.message)}`)
-            }));
+            if(monitoringConfigurationFilter(monitoringConfiguration)){
+              logger.info(`monitoringConfiguration ${monitoringConfiguration.appName}_${monitoringConfiguration.apiName} passed the filter, adding test promise`)
+              tests.push(testIt(monitoringConfiguration, axios, sender).catch((error) => {
+                logger.error(`error in test for ${JSON.stringify(monitoringConfiguration)}: ${JSON.stringify(error.message)}`)
+              }));
+            }
 
-        }catch (parseError){
-            console.error(`error parsing test for ${JSON.stringify(tableConfiguration)}. ${parseError.message}`)
+
+
+
+        } catch (parseError){
+            logger.error(`error parsing test for ${JSON.stringify(tableConfiguration)}. ${parseError.message}`)
             tests.push(new Promise((resolve, reject) => {
                 reject(parseError.message)
               }));
@@ -107,23 +115,21 @@ async function main() {
     }
 
     await Promise.all(tests)
-                 .then((result) => {utils.trackSelfAvailabilityEvent(successMonitoringEvent, startTime, client, "ok"); console.log("SUCCESS")})
-                 .catch((error) => {utils.trackSelfAvailabilityEvent(failedMonitoringEvent, startTime, client, error); console.error(`FAILURE: ${error}`)})
-};
+                 .then(onSuccess(startTime))
+                 .catch(onFailure(startTime))
+}
 
 
 /**
  * executes the test configured by a monitoring configuration, sends the generated telemetry and events
- * returns a promise fullfilled when the thest is ran (any outcome), rejected when the execution fails
- * @param {monitoringConfiguration} monitoringConfiguration
- * @param {TelemetryClient} telemetryClient
- * @param {*} sslClient
- * @param {axios} httpClient axios client
- * @returns promise rejected in case of a test EXECUTION failure
+ * returns a promise fulfilled when the test is ran (any outcome), rejected when the execution fails
+ * @param {monitoringConfiguration} monitoringConfiguration the monitoring configuration object
+ * @param {axios} httpClient axios client instance
+ * @param {*} sender telemetry sender function
+ * @returns {Promise} promise fulfilled when test completes, rejected in case of execution failure
  */
-async function testIt(monitoringConfiguration, telemetryClient, httpClient){
-  console.log(`preparing test for ${JSON.stringify(monitoringConfiguration)}`)
-
+async function testIt(monitoringConfiguration, httpClient, sender){
+  logger.info(`preparing test for ${JSON.stringify(monitoringConfiguration)}`)
   let metricObjects =  statics.initMetricObjects(monitoringConfiguration);
 
   let metricContex = {
@@ -143,10 +149,6 @@ async function testIt(monitoringConfiguration, telemetryClient, httpClient){
   }
 
   return utils.checkApi(metricContex, httpClient)
-  .then(utils.telemetrySender(telemetryClient))
-  .then(utils.eventSender(telemetryClient))
-
+    .then(sender)
 }
 
-//start process
-main()

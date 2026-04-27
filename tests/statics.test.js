@@ -568,32 +568,142 @@ describe('initMetricObjects tests', () => {
 
 describe('getCert tests', () => {
 
-  test('returns cert when found in response', () => {
-    let validTo = new Date();
-    validTo.setDate(validTo.getDate() + 9);
-    let mockCertResponse = {valid_to: validTo}
-    
-    let mockApiResponse = {
-      request: {
-        res: {
-          socket: {
-            getPeerCertificate: function(bool){
-              return mockCertResponse
-            }
-          }
-        }
-      }
-    }
-    let mockTlsClient = {
-      connect : function(){}
-    }
-    let jestMockTlsClient = jest.spyOn(mockTlsClient, 'connect')
-    statics.getCert(dummyMetricContex, mockApiResponse, jestMockTlsClient).then(data =>{
-      expect(data).toMatchObject(mockCertResponse);
+   test('returns cert when found in response', () => {
+     let validTo = new Date();
+     validTo.setDate(validTo.getDate() + 9);
+     let mockCertResponse = {valid_to: validTo}
 
-      expect(jestMockTlsClient).not.toHaveBeenCalled()
-    })
+     let mockApiResponse = {
+       request: {
+         res: {
+           socket: {
+             getPeerCertificate: function(bool){
+               return mockCertResponse
+             }
+           }
+         }
+       }
+     }
+     let mockTlsClient = {
+       connect : function(){}
+     }
+     let jestMockTlsClient = jest.spyOn(mockTlsClient, 'connect')
+     statics.getCert(dummyMetricContex, mockApiResponse, jestMockTlsClient).then(data =>{
+       expect(data).toMatchObject(mockCertResponse);
 
+       expect(jestMockTlsClient).not.toHaveBeenCalled()
+     })
+
+   });
+
+   test('falls back to getCertWithTls when cert not found in response socket', () => {
+     let validTo = new Date();
+     validTo.setDate(validTo.getDate() + 9);
+     let mockCertFromTls = {valid_to: validTo}
+
+     let mockApiResponse = {
+       request: {
+         res: {
+           socket: {
+             getPeerCertificate: function(bool){
+               return null
+             }
+           }
+         }
+       }
+     }
+
+     let mockSocket = {
+       getPeerCertificate: function(){
+         return mockCertFromTls
+       },
+       end: function(){},
+       on: function(event, callback){
+         // Mock error handler - do nothing in this test
+       }
+     }
+
+     let callbackHolder;
+     let mockTlsClient = {
+       connect : function(options, callback){
+         // Store the callback to call it on next tick
+         callbackHolder = callback;
+         return mockSocket;
+       }
+     }
+
+     // Manually call the callback asynchronously after setup
+     const promise = statics.getCert(dummyMetricContex, mockApiResponse, mockTlsClient);
+
+     // Call the callback on next tick
+     Promise.resolve().then(() => {
+       if (callbackHolder) {
+         callbackHolder();
+       }
+     });
+
+     return promise.then(data =>{
+       expect(data).toMatchObject(mockCertFromTls);
+     })
+   });
+
+})
+
+
+describe('monitorConfigurationFilterByName tests', () => {
+  test('returns true when appName is in acceptedNames list', () => {
+    let acceptedNames = ["myApp", "otherApp"]
+    let monitoringConfiguration = { apiName: "test-api", appName: "myApp" }
+    let filterFunction = statics.monitorConfigurationFilterByName(acceptedNames)
+
+    expect(filterFunction(monitoringConfiguration)).toBe(true);
   });
 
+  test('returns false when appName is not in acceptedNames list', () => {
+    let acceptedNames = ["myApp", "otherApp"]
+    let monitoringConfiguration = { apiName: "test-api", appName: "notInList" }
+    let filterFunction = statics.monitorConfigurationFilterByName(acceptedNames)
+
+    expect(filterFunction(monitoringConfiguration)).toBe(false);
+  });
+
+  test('works with array filter method', () => {
+    let acceptedNames = ["myApp", "otherApp"]
+    let configurations = [
+      { apiName: "test-api", appName: "myApp" },
+      { apiName: "other-api", appName: "notInList" },
+      { apiName: "third-api", appName: "otherApp" }
+    ]
+    let filterFunction = statics.monitorConfigurationFilterByName(acceptedNames)
+    let filtered = configurations.filter(filterFunction)
+
+    expect(filtered).toEqual([
+      { apiName: "test-api", appName: "myApp" },
+      { apiName: "third-api", appName: "otherApp" }
+    ]);
+  });
+
+  test('returns false when acceptedNames is empty', () => {
+    let acceptedNames = []
+    let monitoringConfiguration = { apiName: "test-api", appName: "myApp" }
+    let filterFunction = statics.monitorConfigurationFilterByName(acceptedNames)
+
+    expect(filterFunction(monitoringConfiguration)).toBe(false);
+  });
+
+  test('filters case-sensitive by default', () => {
+    let acceptedNames = ["myApp"]
+    let monitoringConfiguration = { apiName: "test-api", appName: "MyApp" }
+    let filterFunction = statics.monitorConfigurationFilterByName(acceptedNames)
+
+    expect(filterFunction(monitoringConfiguration)).toBe(false);
+  });
+
+  test('returns true when appName exactly matches one of acceptedNames', () => {
+    let acceptedNames = ["appOne", "appTwo", "appThree"]
+    let monitoringConfiguration = { apiName: "some-api", appName: "appTwo" }
+    let filterFunction = statics.monitorConfigurationFilterByName(acceptedNames)
+
+    expect(filterFunction(monitoringConfiguration)).toBe(true);
+  });
 })

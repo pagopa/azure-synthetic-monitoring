@@ -1,4 +1,4 @@
-FROM node:18.19.0-buster
+FROM node:lts-alpine3.22@sha256:b689d4005875ae167178471a7a622ec2909459a3bbb32277260be1971af7a99f
 
 RUN mkdir -p /home/node/app/node_modules && chown -R node:node /home/node/app
 WORKDIR /home/node/app
@@ -6,4 +6,4 @@ COPY package.json ./
 USER node
 RUN npm install
 COPY --chown=node:node src/*.js .
-CMD [ "node", "synthetic-monitoring.js" ]
+CMD [ "node", "main.js" ]
