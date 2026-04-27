@@ -62,7 +62,9 @@ function readCert(metricContext, certResponse){
             const millisBeforeExpiration = metricContext.monitoringConfiguration.certValidityRangeDays * 24 * 60 * 60 * 1000
             logger.info(`cert response for ${metricContext.testId}: valid to ${certResponse.valid_to}`)
             let validTo = new Date(certResponse.valid_to);
+            logger.debug(`validTo: ${certResponse.valid_to}`);
             const millisToExpiration = validTo - Date.now();
+            logger.debug(`millisToExpiration: ${millisToExpiration}, millisBeforeExpiration: ${millisBeforeExpiration}`)
             metricContext.certMetrics['success'] = millisToExpiration > millisBeforeExpiration;
             metricContext.certMetrics['certSuccess'] = millisToExpiration > millisBeforeExpiration ? 1 : 0
             metricContext.certMetrics['targetExpireInDays'] = Math.floor(millisToExpiration / 86400000); //convert in days
