@@ -18,7 +18,7 @@ try {
     const aiSetup = appInsights.setup(connString);
     if (aiSetup) {
       aiSetup.start();
-      telemetryClient = new appInsights.TelemetryClient(connString);
+      telemetryClient = appInsights.defaultClient;
       logger.debug("Application Insights telemetry client initialized successfully");
       logger.debug(`Telemetry client available: ${telemetryClient !== undefined && telemetryClient !== null}`);
     }
