@@ -57,7 +57,7 @@ function eventSender(client){
 
         logger.info(`event for ${metricContext.testId}: ${JSON.stringify(metricContext.baseEventData)}`)
         client.trackEvent(metricContext.baseEventData);
-        logger.debug("event sent")
+        logger.info(`event sent for ${metricContext.testId}`)
         return metricContext;
     }
 }
@@ -75,12 +75,14 @@ function telemetrySender(client){
             let apiTelemetryData = statics.enrichData(metricContext.baseTelemetryData, metricContext.apiMetrics, constants.keysForTelemetry);
             logger.info(`tracking api telemetry for ${metricContext.testId} : ${JSON.stringify(apiTelemetryData)}`)
             client.trackAvailability(apiTelemetryData);
+            logger.info(`api telemetry sent for ${metricContext.testId}`)
         }
 
         if (metricContext.certMetrics && Object.keys(metricContext.certMetrics).length > 0 && metricContext.monitoringConfiguration.checkCertificate){
             let certTelemetryData = statics.enrichData(metricContext.baseTelemetryData, metricContext.certMetrics, constants.keysForTelemetry);
             logger.info(`tracking cert telemetry for ${metricContext.testId}: ${JSON.stringify(certTelemetryData)}`)
             client.trackAvailability(certTelemetryData);
+            logger.info(`cert telemetry sent for ${metricContext.testId}`)
         }
         logger.debug("telemetry sent")
         return metricContext
