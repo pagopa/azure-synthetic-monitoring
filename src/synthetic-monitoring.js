@@ -1,5 +1,4 @@
 //dependencies
-const appInsights = require("applicationinsights");
 const axios = require('axios');
 const { TableClient, AzureNamedKeyCredential } = require("@azure/data-tables");
 const process = require('process')
@@ -19,15 +18,6 @@ const availabilityPrefix = process.env.AVAILABILITY_PREFIX
 const httpClientTimeout = process.env.HTTP_CLIENT_TIMEOUT
 const certValidityRangeDays = process.env.CERT_VALIDITY_RANGE_DAYS
 
-try {
-  const aiSetup = appInsights.setup(process.env.APP_INSIGHT_CONNECTION_STRING);
-  if (aiSetup) {
-    aiSetup.start();
-    logger.debug("Application Insights initialized successfully");
-  }
-} catch (error) {
-  logger.error(`Failed to initialize Application Insights: ${error.message}`);
-}
 
 //clients
 let tableClient;
@@ -97,9 +87,9 @@ async function runMonitoring(monitoringConfigurationFilter, sender, onSuccess, o
             logger.debug(`monitoringConfiguration: ${JSON.stringify(monitoringConfiguration)}`)
 
             if(monitoringConfigurationFilter(monitoringConfiguration)){
-              logger.info(`monitoringConfiguration ${monitoringConfiguration.appName}_${monitoringConfiguration.apiName} passed the filter, adding test promise`)
+              logger.info(statics.testId(monitoringConfiguration), `passed the filter, adding test promise`)
               tests.push(testIt(monitoringConfiguration, axios, sender).catch((error) => {
-                logger.error(`error in test for ${JSON.stringify(monitoringConfiguration)}: ${JSON.stringify(error.message)}`)
+                logger.error(statics.testId(monitoringConfiguration), `error in test: ${JSON.stringify(error.message)}`)
               }));
             }
 
@@ -129,11 +119,12 @@ async function runMonitoring(monitoringConfigurationFilter, sender, onSuccess, o
  * @returns {Promise} promise fulfilled when test completes, rejected in case of execution failure
  */
 async function testIt(monitoringConfiguration, httpClient, sender){
-  logger.info(`preparing test for ${JSON.stringify(monitoringConfiguration)}`)
-  let metricObjects =  statics.initMetricObjects(monitoringConfiguration);
+  let testId = statics.testId(monitoringConfiguration);
+  logger.debug(testId, `preparing test`)
 
+  let metricObjects =  statics.initMetricObjects(monitoringConfiguration);
   let metricContex = {
-      testId: `${monitoringConfiguration.appName}_${monitoringConfiguration.apiName}_${monitoringConfiguration.type}`,
+      testId: testId,
       baseTelemetryData : metricObjects.telemetry,
       baseEventData : metricObjects.event,
       monitoringConfiguration: monitoringConfiguration,
