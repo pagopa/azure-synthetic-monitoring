@@ -189,11 +189,12 @@ async function getCertWithTls(metricContext, tlsClient){
         socket.on('error', (err) => {
             logger.error(metricContext.testId, `socket error: ${JSON.stringify(err)}`);
             socket.end();
+            reject('cert unavailable')
         });
     }).then((result => {
         result.socket.end();
         return result.cert;
-    }))
+    })).catch(error => {return  null})
 }
 
 /**
