@@ -65,7 +65,28 @@ async function execute() {
      utils.eventAndTelemetrySender(telemetryClient),
      utils.cronOnSuccess(telemetryClient, successMonitoringEvent),
      utils.cronOnError(telemetryClient, failedMonitoringEvent)
-   ).finally(() => {logger.info("flushing telemetry"); telemetryClient.flush()});
+   );
+   
+   // Wait a bit for SDK to queue telemetry, then flush
+   await new Promise(resolve => setTimeout(resolve, 100));
+   
+   // Flush telemetry to ensure all metrics are sent before function terminates
+   logger.info("Flushing telemetry to Application Insights");
+   return new Promise((resolve) => {
+    if (!telemetryClient) {
+      logger.error("Telemetry client is null, skipping flush");
+      resolve();
+      return;
+    }
+    telemetryClient.flush({ isAppCrashing: false }, (error) => {
+      if (error) {
+        logger.error(`Failed to flush telemetry: ${error}`);
+      } else {
+        logger.info("Telemetry flushed successfully");
+      }
+      resolve();
+    });
+   });
 }
 
 

@@ -57,7 +57,7 @@ function eventSender(client){
 
         logger.info(metricContext.testId, `event: ${JSON.stringify(metricContext.baseEventData)}`)
         try{
-          client.trackEvent(metricContext.baseEventData);
+          await client.trackEvent(metricContext.baseEventData);
           logger.info(metricContext.testId, `event sent`)
         }catch(error){
           logger.error(metricContext.testId, `error in track event: ${error}`)
