@@ -56,7 +56,12 @@ function eventSender(client){
         metricContext.baseEventData['properties'] = enrichedProperties
 
         logger.info(`event for ${metricContext.testId}: ${JSON.stringify(metricContext.baseEventData)}`)
-        client.trackEvent(metricContext.baseEventData);
+        try{
+          client.trackEvent(metricContext.baseEventData);
+        }catch(error){
+          logger.error(`error in track event for ${metricContext.testId}: ${error}`)
+        }
+
         logger.info(`event sent for ${metricContext.testId}`)
         return metricContext;
     }
