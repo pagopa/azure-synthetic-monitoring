@@ -10,11 +10,18 @@ const location = process.env.LOCATION
 
 let telemetryClient;
 try {
-  const aiSetup = appInsights.setup(process.env.APP_INSIGHT_CONNECTION_STRING);
-  if (aiSetup) {
-    aiSetup.start();
-    telemetryClient = new appInsights.TelemetryClient(process.env.APP_INSIGHT_CONNECTION_STRING);
-    logger.debug("Application Insights client initialized successfully");
+  const connString = process.env.APP_INSIGHT_CONNECTION_STRING;
+  if (!connString) {
+    logger.error("APP_INSIGHT_CONNECTION_STRING environment variable is not set");
+  } else {
+    logger.debug(`Initializing telemetry client with connection string (first 50 chars): ${connString.substring(0, 50)}...`);
+    const aiSetup = appInsights.setup(connString);
+    if (aiSetup) {
+      aiSetup.start();
+      telemetryClient = new appInsights.TelemetryClient(connString);
+      logger.debug("Application Insights telemetry client initialized successfully");
+      logger.debug(`Telemetry client available: ${telemetryClient !== undefined && telemetryClient !== null}`);
+    }
   }
 } catch (error) {
   logger.error(`Failed to initialize Application Insights: ${error.message}`);

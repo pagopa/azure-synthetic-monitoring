@@ -1,5 +1,4 @@
 //dependencies
-const appInsights = require("applicationinsights");
 const axios = require('axios');
 const { TableClient, AzureNamedKeyCredential } = require("@azure/data-tables");
 const process = require('process')
@@ -19,15 +18,6 @@ const availabilityPrefix = process.env.AVAILABILITY_PREFIX
 const httpClientTimeout = process.env.HTTP_CLIENT_TIMEOUT
 const certValidityRangeDays = process.env.CERT_VALIDITY_RANGE_DAYS
 
-try {
-  const aiSetup = appInsights.setup(process.env.APP_INSIGHT_CONNECTION_STRING);
-  if (aiSetup) {
-    aiSetup.start();
-    logger.debug("Application Insights initialized successfully");
-  }
-} catch (error) {
-  logger.error(`Failed to initialize Application Insights: ${error.message}`);
-}
 
 //clients
 let tableClient;
