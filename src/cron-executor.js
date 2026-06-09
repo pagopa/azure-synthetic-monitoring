@@ -58,7 +58,7 @@ async function execute() {
      utils.eventAndTelemetrySender(telemetryClient),
      utils.cronOnSuccess(telemetryClient, successMonitoringEvent),
      utils.cronOnError(telemetryClient, failedMonitoringEvent)
-   );
+   ).finally(() => {telemetryClient.flush()});
 }
 
 
