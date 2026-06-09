@@ -107,8 +107,10 @@ function apiResponseElaborator(metricContext){
             logger.debug(metricContext.testId, `checking cert: ${JSON.stringify(serverCert)}`)
 
             if(serverCert) {
+              logger.info(metricContext.testId, 'cert received: tracking', serverCert)
                 metricContext = readCert(metricContext, serverCert)
             } else {
+                logger.info(metricContext.testId, 'cert NOT received: tracking')
                 metricContext = readCertError(metricContext, {message: 'cert not found'})
 
             }
