@@ -66,10 +66,10 @@ async function execute() {
      utils.cronOnSuccess(telemetryClient, successMonitoringEvent),
      utils.cronOnError(telemetryClient, failedMonitoringEvent)
    );
-   
+
    // Wait a bit for SDK to queue telemetry, then flush
    await new Promise(resolve => setTimeout(resolve, 100));
-   
+
    // Flush telemetry to ensure all metrics are sent before function terminates
    logger.info("Flushing telemetry to Application Insights");
    return new Promise((resolve) => {

@@ -609,7 +609,7 @@ describe('logSender tests', () => {
 
         utils.logSender(dummyMetricContex);
 
-        expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('logSender'));
+        expect(logSpy).toHaveBeenCalledWith(dummyMetricContex.testId, expect.stringContaining('logSender'));
         logSpy.mockRestore();
     });
 })
