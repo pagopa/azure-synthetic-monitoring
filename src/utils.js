@@ -55,14 +55,15 @@ function eventSender(client){
         metricContext.baseEventData['measurements'] = enrichedMeasurements
         metricContext.baseEventData['properties'] = enrichedProperties
 
-        logger.info(`event for ${metricContext.testId}: ${JSON.stringify(metricContext.baseEventData)}`)
+        logger.info(metricContext.testId, `event: ${JSON.stringify(metricContext.baseEventData)}`)
         try{
           client.trackEvent(metricContext.baseEventData);
+          logger.info(metricContext.testId, `event sent`)
         }catch(error){
-          logger.error(`error in track event for ${metricContext.testId}: ${error}`)
+          logger.error(metricContext.testId, `error in track event: ${error}`)
         }
 
-        logger.info(`event sent for ${metricContext.testId}`)
+
         return metricContext;
     }
 }
@@ -78,18 +79,27 @@ function telemetrySender(client){
         //merge monitoring results and send
         if (metricContext.apiMetrics && Object.keys(metricContext.apiMetrics).length > 0 ){
             let apiTelemetryData = statics.enrichData(metricContext.baseTelemetryData, metricContext.apiMetrics, constants.keysForTelemetry);
-            logger.info(`tracking api telemetry for ${metricContext.testId} : ${JSON.stringify(apiTelemetryData)}`)
+            logger.info(metricContext.testId, `tracking api telemetry: ${JSON.stringify(apiTelemetryData)}`)
+          try{
             client.trackAvailability(apiTelemetryData);
-            logger.info(`api telemetry sent for ${metricContext.testId}`)
+            logger.info(metricContext.testId, `api telemetry sent`)
+          }catch(error){
+            logger.error(metricContext.testId, `error in track api availability: ${error}`)
+          }
+
         }
 
         if (metricContext.certMetrics && Object.keys(metricContext.certMetrics).length > 0 && metricContext.monitoringConfiguration.checkCertificate){
             let certTelemetryData = statics.enrichData(metricContext.baseTelemetryData, metricContext.certMetrics, constants.keysForTelemetry);
-            logger.info(`tracking cert telemetry for ${metricContext.testId}: ${JSON.stringify(certTelemetryData)}`)
-            client.trackAvailability(certTelemetryData);
-            logger.info(`cert telemetry sent for ${metricContext.testId}`)
+            logger.info(metricContext.testId, `tracking cert telemetry: ${JSON.stringify(certTelemetryData)}`)
+            try {
+              client.trackAvailability(certTelemetryData);
+              logger.info(metricContext.testId, `cert telemetry sent`)
+            } catch (error) {
+              logger.error(metricContext.testId, `error in track cert availability: ${error}`)
+            }
+
         }
-        logger.debug("telemetry sent")
         return metricContext
     }
 }
@@ -118,7 +128,7 @@ function eventAndTelemetrySender(client){
  */
 async function checkApi(metricContext, httpClient){
     metricContext['startTime'] = Date.now();
-    logger.info(`check api for ${metricContext.testId}, ${JSON.stringify(statics.buildRequest(metricContext.monitoringConfiguration))}`)
+    logger.info(metricContext.testId, `check api, ${JSON.stringify(statics.buildRequest(metricContext.monitoringConfiguration))}`)
     return httpClient(statics.buildRequest(metricContext.monitoringConfiguration))
         .then(statics.apiResponseElaborator(metricContext))
         .catch(statics.apiErrorElaborator(metricContext))
@@ -126,7 +136,7 @@ async function checkApi(metricContext, httpClient){
 
 
 function logSender(metricContext){
-  logger.info(`logSender ${metricContext.testId}: ${JSON.stringify(metricContext)}`)
+  logger.info(metricContext.testId, `logSender: ${JSON.stringify(metricContext)}`)
 }
 
 function logSuccess(startTime) {
@@ -146,7 +156,7 @@ function logError(startTime) {
  * @returns metricContext
  */
 function resultCollectorSender(metricContext) {
-    logger.debug(`resultCollectorSender ${metricContext.testId}: result collected`)
+    logger.debug(metricContext.testId, `resultCollectorSender: result collected`)
     return metricContext;
 }
 
@@ -184,7 +194,7 @@ function queueOnSuccess(requestQueueClient, responseQueueClient, messageId, popR
 
             await responseQueueClient.sendMessage(JSON.stringify(testResults));
             await requestQueueClient.deleteMessage(messageId, popReceipt);
-            logger.info(`SUCCESS for alarmId ${alarmId}: sent ${payload.length} results to response queue`);
+            logger.info(alarmId, `SUCCESS for alarmId: sent ${payload.length} results to response queue`);
         }
     }
 }
@@ -213,7 +223,7 @@ function queueOnError(requestQueueClient, responseQueueClient, messageId, popRec
       }
       await responseQueueClient.sendMessage(JSON.stringify(testResults));
       await requestQueueClient.deleteMessage(messageId, popReceipt);
-      logger.error(`FAILURE for alarm ${alarmId}: ${error}. sent error results to response queue`);
+      logger.error(alarmId, `FAILURE for alarm: ${error}. sent error results to response queue`);
     }
   }
 }

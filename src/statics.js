@@ -17,7 +17,8 @@ module.exports = {
     initMetricObjects,
     isStatusCodeAccepted,
     getCert,
-    monitorConfigurationFilterByName
+    monitorConfigurationFilterByName,
+    testId
 }
 
 /**
@@ -60,7 +61,7 @@ function enrichData(baseData, checkResult, keyList){
 function readCert(metricContext, certResponse){
         if (certResponse != null) {
             const millisBeforeExpiration = metricContext.monitoringConfiguration.certValidityRangeDays * 24 * 60 * 60 * 1000
-            logger.info(`cert response for ${metricContext.testId}: valid to ${certResponse.valid_to}`)
+            logger.info(metricContext.testId, `cert response: valid to ${certResponse.valid_to}`)
             let validTo = new Date(certResponse.valid_to);
             const millisToExpiration = validTo - Date.now();
             metricContext.certMetrics['success'] = millisToExpiration > millisBeforeExpiration;
@@ -70,7 +71,7 @@ function readCert(metricContext, certResponse){
             metricContext.certMetrics['runLocation'] = `${metricContext.monitoringConfiguration.type}-cert`
             return metricContext
         } else {
-            logger.info(`unable to check certificate for ${metricContext.testId}. cert is null`)
+            logger.info(metricContext.testId, `unable to check certificate. cert is null`)
             return readCertError(metricContext, {message: 'server cert is null'})
         }
 
@@ -84,7 +85,7 @@ function readCert(metricContext, certResponse){
  * @returns an async function that receives an error and returns the enriched metric context
  */
 function readCertError(metricContext, error){
-        logger.info(`cert error for ${metricContext.testId}: ${JSON.stringify(error)}`)
+        logger.info(metricContext.testId, `cert error: ${JSON.stringify(error)}`)
         metricContext.certMetrics['message'] = error.message
         metricContext.certMetrics['runLocation'] = `${metricContext.monitoringConfiguration.type}-cert`
         metricContext.certMetrics['success'] = false
@@ -99,11 +100,11 @@ function readCertError(metricContext, error){
  */
 function apiResponseElaborator(metricContext){
     return async function(response){
-        logger.info(`api response for ${metricContext.testId}: ${response.status}`)
+        logger.info(metricContext.testId, `api response: ${response.status}`)
 
         if (metricContext.monitoringConfiguration.checkCertificate == 'true'){
             let serverCert = await getCert(metricContext, response, tls);
-            logger.debug(`checking cert for ${metricContext.testId}: ${JSON.stringify(serverCert)}`)
+            logger.debug(metricContext.testId, `checking cert: ${JSON.stringify(serverCert)}`)
 
             if(serverCert) {
                 metricContext = readCert(metricContext, serverCert)
@@ -113,7 +114,7 @@ function apiResponseElaborator(metricContext){
             }
         }
         let statusCodeOk = isStatusCodeAccepted(response.status, metricContext.monitoringConfiguration.expectedCodes)
-        logger.info(`status code accepted for ${metricContext.testId}? ${statusCodeOk}`)
+        logger.info(metricContext.testId, `status code accepted? ${statusCodeOk}`)
         let errorMessage = ""
 
         let duration = response[constants.RESPONSE_TIME_KEY];
@@ -123,7 +124,7 @@ function apiResponseElaborator(metricContext){
         const bodyCompareStrategy = metricContext.monitoringConfiguration.bodyCompareStrategy
         if (!isNull(bodyCompareStrategy)){
             const expectedBody = metricContext.monitoringConfiguration.expectedBody
-            logger.info(`comparing body for ${metricContext.testId}. Received body: ${response.data}`)
+            logger.info(metricContext.testId, `comparing body. Received body: ${response.data}`)
             bodyMatches =  comparator.compare(bodyCompareStrategy, response.data, expectedBody)
         }
 
@@ -156,15 +157,15 @@ function apiResponseElaborator(metricContext){
 
 async function getCert(metricContext, response, tlsClient){
     let serverCert = response.request.res.socket?.getPeerCertificate(false) || null;
-    logger.info(`cert from response for ${metricContext.testId}: ${JSON.stringify(serverCert)}`)
+    logger.info(metricContext.testId, `cert from response: ${JSON.stringify(serverCert)}`)
     if (serverCert) {
         return serverCert
     } else {
-        logger.info(`server cert is null for ${metricContext.testId}, checking with tls...`)
+        logger.info(metricContext.testId, `server cert is null, checking with tls...`)
         try{
             serverCert = await getCertWithTls(metricContext, tlsClient)
         } catch(error) {
-            logger.error(`failed to load server cert for ${metricContext.testId}, ${error}`)
+            logger.error(metricContext.testId, `failed to load server cert, ${error}`)
             serverCert = null
         }
         return serverCert
@@ -182,11 +183,11 @@ async function getCertWithTls(metricContext, tlsClient){
         };
         const socket = tlsClient.connect(options, () => {
             const cert = socket.getPeerCertificate();
-            logger.debug(`got cert using tls for ${metricContext.testId}: ${JSON.stringify(cert)}`)
+            logger.debug(metricContext.testId, `cert with tls: ${JSON.stringify(cert)}`)
             resolve({cert: cert, socket: socket});
         });
         socket.on('error', (err) => {
-            logger.error(`socket error for ${metricContext.testId}: ${JSON.stringify(err)}`);
+            logger.error(metricContext.testId, `socket error: ${JSON.stringify(err)}`);
             socket.end();
         });
     }).then((result => {
@@ -202,7 +203,7 @@ async function getCertWithTls(metricContext, tlsClient){
  */
 function apiErrorElaborator(metricContext){
     return async function(error){
-        logger.info(`api error for ${metricContext.testId}: ${JSON.stringify(error.message)}`)
+        logger.info(metricContext.testId, `api error: ${JSON.stringify(error.message)}`)
         let elapsedMillis = Date.now() - metricContext['startTime'];
 
         if (metricContext.monitoringConfiguration.checkCertificate == 'true'){
@@ -340,4 +341,14 @@ function monitorConfigurationFilterByName(acceptedNames){
     return function (monitoringConfiguration) {
       return acceptedNames.includes(monitoringConfiguration.appName);
     }
+}
+
+
+/**
+ * generates a unique test identifier from the monitoring configuration
+ * @param {object} monitoringConfiguration the monitoring configuration object
+ * @returns {string} a unique test id combining appName, apiName, and type separated by underscores
+ */
+function testId(monitoringConfiguration){
+  return `${monitoringConfiguration.appName}_${monitoringConfiguration.apiName}_${monitoringConfiguration.type}`
 }
