@@ -126,7 +126,7 @@ function apiResponseElaborator(metricContext){
         const bodyCompareStrategy = metricContext.monitoringConfiguration.bodyCompareStrategy
         if (!isNull(bodyCompareStrategy)){
             const expectedBody = metricContext.monitoringConfiguration.expectedBody
-            logger.info(metricContext.testId, `comparing body. Received body: ${response.data}`)
+            logger.debug(metricContext.testId, `comparing body. Received body: ${response.data}`)
             bodyMatches =  comparator.compare(bodyCompareStrategy, response.data, expectedBody)
         }
 
@@ -159,11 +159,11 @@ function apiResponseElaborator(metricContext){
 
 async function getCert(metricContext, response, tlsClient){
     let serverCert = response.request.res.socket?.getPeerCertificate(false) || null;
-    logger.info(metricContext.testId, `cert from response: ${JSON.stringify(serverCert)}`)
+    logger.debug(metricContext.testId, `cert from response: ${JSON.stringify(serverCert)}`)
     if (serverCert) {
         return serverCert
     } else {
-        logger.info(metricContext.testId, `server cert is null, checking with tls...`)
+        logger.debug(metricContext.testId, `server cert is null, checking with tls...`)
         try{
             serverCert = await getCertWithTls(metricContext, tlsClient)
         } catch(error) {
