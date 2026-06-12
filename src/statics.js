@@ -126,7 +126,7 @@ function apiResponseElaborator(metricContext){
         const bodyCompareStrategy = metricContext.monitoringConfiguration.bodyCompareStrategy
         if (!isNull(bodyCompareStrategy)){
             const expectedBody = metricContext.monitoringConfiguration.expectedBody
-            logger.debug(metricContext.testId, `comparing body. Received body: ${response.data}`)
+            logger.debug(metricContext.testId, `comparing body. Received body: ${JSON.stringify(response.data)}`)
             bodyMatches =  comparator.compare(bodyCompareStrategy, response.data, expectedBody)
         }
 
