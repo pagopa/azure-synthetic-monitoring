@@ -1,6 +1,7 @@
 // modules
 const utils = require('./utils')
 const logger = require('./logger')
+const axios = require('axios');
 
 const tester = require('./synthetic-monitoring')
 const appInsights = require("applicationinsights");
@@ -62,7 +63,7 @@ async function execute() {
    // call tester with a "keep all" filter
    await tester.runMonitoring(
      filterKeepAll,
-     utils.eventAndTelemetrySender(telemetryClient),
+     utils.appInsightAndIcingaSender(telemetryClient, axios),
      utils.cronOnSuccess(telemetryClient, successMonitoringEvent),
      utils.cronOnError(telemetryClient, failedMonitoringEvent)
    );

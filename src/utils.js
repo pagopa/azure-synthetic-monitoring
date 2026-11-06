@@ -8,6 +8,7 @@ module.exports = {
     eventSender,
     telemetrySender,
     eventAndTelemetrySender,
+    appInsightAndIcingaSender,
     checkApi,
     logSender,
     logSuccess,
@@ -118,6 +119,53 @@ function eventAndTelemetrySender(client){
 }
 
 
+/**
+ * Creates a sender that sequentially sends an event and availability telemetry
+ * to Application Insights, then sends a check result to Icinga.
+ * @param {TelemetryClient} telemetryClient Application Insights telemetry client
+ * @param {Axios} httpClient HTTP client used to send the Icinga check result
+ * @returns {function} An async function that accepts and returns the metric context
+ */
+function appInsightAndIcingaSender(telemetryClient, httpClient) {
+  return async function (metricContext) {
+    const contextAfterEvent = await eventSender(telemetryClient)(metricContext);
+    const contextAfterTelemetry = await telemetrySender(telemetryClient)(contextAfterEvent);
+    return await icingaSender(contextAfterTelemetry, httpClient);
+  }
+}
+
+/**
+ * Sends a check result to Icinga.
+ * @param {object} metricContext The metric context used for logging
+ * @param {Axios} client HTTP client used to post the check result
+ * @returns {Promise<object>} The metric context
+ */
+async function icingaSender(metricContext, client){
+    const payload = {
+      type: 'Service',
+      filter: 'host.name=="synthetics" && service.name=="login-flow"',
+      exit_status: 2,
+      plugin_output: 'Login fallito: timeout dopo 10s',
+      performance_data: ['duration=10.2s;3;8'],
+      check_source: 'azure-synthetics',
+      ttl: 900
+    };
+
+    return client({
+            method: "post",
+            url: 'https://icinga.tuo.dominio.it:5665/v1/actions/process-check-result',
+            data: payload,
+            headers: {
+                Accept: 'application/json'
+            },
+            auth: {
+              username: 'synthetics',
+              password: process.env.ICINGA_PASSWORD
+            }
+    })
+        .then((response) => {logger.info(metricContext.testId, `Icinga check result sent: ${JSON.stringify(response.data)}`); return metricContext;})
+        .catch((error => {logger.error(metricContext.testId, `error sending Icinga check result: ${error}`); return metricContext;}));
+}
 
 /**
  * calls the configured api and checks the response, populating the metric context accordingly
