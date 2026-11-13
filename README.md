@@ -148,13 +148,15 @@ When checking the certificate, the suffix `-cert` will be appended to the "runLo
 | `STORAGE_ACCOUNT_CONNECTION_STRING` | storage account connection string. used by the queue client in queue mode                           | queue mode only     | -         |
 | `INBOUND_QUEUE_NAME`              | name of the Azure Storage Queue from which monitoring requests are read                               | queue mode only     | -         |
 | `OUTBOUND_QUEUE_NAME`             | name of the Azure Storage Queue to which monitoring results are written                               | queue mode only     | -         |
-| `QUEUE_BATCH_SIZE`                | number of messages to retrieve from the inbound queue in each execution                                | queue mode only     | `1`       |
+| `QUEUE_BATCH_SIZE`                | number of messages to retrieve from the inbound queue in each execution                               | queue mode only     | `1`       |
 | `OPERATION_MODE`                  | execution mode. accepted values: `cron`, `queue`                                                      | no                  | `cron`    |
 | `AVAILABILITY_PREFIX`             | prefix used in the custom metric and events names                                                     | no                  | synthetic |
 | `HTTP_CLIENT_TIMEOUT`             | response timeout used by the http client performing the availability requests                         | yes                 | -         |
 | `LOCATION`                        | region name where this job is run                                                                     | yes                 | -         |
 | `CERT_VALIDITY_RANGE_DAYS`        | number of days before the expiration date of a certificate over which the check is considered success | yes                 | -         |
 | `LOG_LEVEL`                       | logging verbosity. accepted values: `DEBUG`, `INFO`, `ERROR`                                          | no                  | `INFO`    |
+| `ICINGA_PASSWORD`                 | password used for icinga integration                                                                  | no                  | -         |
+| `ICINGA_INTEGRATION_ENABLED`      | enables icinga integration                                                                            | no                  | false     |
 
 ## Deploy
 

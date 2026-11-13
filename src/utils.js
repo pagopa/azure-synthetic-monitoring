@@ -2,6 +2,9 @@ const constants = require('./const')
 const statics = require('./statics')
 const logger = require('./logger')
 
+const http = require ('http')
+const https = require ('https')
+
 
 module.exports = {
     trackSelfAvailabilityEvent,
@@ -130,7 +133,12 @@ function appInsightAndIcingaSender(telemetryClient, httpClient) {
   return async function (metricContext) {
     const contextAfterEvent = await eventSender(telemetryClient)(metricContext);
     const contextAfterTelemetry = await telemetrySender(telemetryClient)(contextAfterEvent);
-    return await icingaSender(contextAfterTelemetry, httpClient);
+    try {
+      return await icingaSender(contextAfterTelemetry, httpClient);
+    } catch (error) {
+      logger.error(metricContext.testId, `error in icingaSender: ${error}`);
+      return contextAfterTelemetry;
+    }
   }
 }
 
@@ -143,25 +151,28 @@ function appInsightAndIcingaSender(telemetryClient, httpClient) {
 async function icingaSender(metricContext, client){
     const payload = {
       type: 'Service',
-      filter: 'host.name=="synthetics" && service.name=="login-flow"',
-      exit_status: 2,
-      plugin_output: 'Login fallito: timeout dopo 10s',
-      performance_data: ['duration=10.2s;3;8'],
-      check_source: 'azure-synthetics',
-      ttl: 900
+      filter: `node.name=="aca" && process.name=="${metricContext.monitoringConfiguration.appName}-${metricContext.monitoringConfiguration.apiName}-${metricContext.monitoringConfiguration.type}"`, // fixme configurare filtro su nome host e process
+      exit_status: metricContext.apiMetrics.success ? 0 : 1,
+      plugin_output: metricContext.baseEventData.properties.message || 'No message provided',
+      performance_data: [`duration=${metricContext.apiMetrics.duration/1000}s;3;8`], //fixme cosa sono i valori dopo la duration?
+      check_source: `${metricContext.monitoringConfiguration.appName}-${metricContext.monitoringConfiguration.apiName}-${metricContext.monitoringConfiguration.type}`,
+      check_command: `synthetic on ${metricContext.monitoringConfiguration.url}`,
+      ttl: 300 //fixme mettere la frequrenza di esecuzione del cron + margine di sicurezza
     };
 
     return client({
             method: "post",
-            url: 'https://icinga.tuo.dominio.it:5665/v1/actions/process-check-result',
+            url: 'https://icinga.internal.dev.platform.pagopa.it:5665/v1/actions/process-check-result', //fixme mettere url in config
             data: payload,
             headers: {
                 Accept: 'application/json'
             },
             auth: {
-              username: 'synthetics',
+              username: 'terraform', //fixme usare utente dedicato?
               password: process.env.ICINGA_PASSWORD
-            }
+            },
+            httpAgent: new http.Agent({ rejectUnauthorized: false }),
+            httpsAgent: new https.Agent({ rejectUnauthorized: false })
     })
         .then((response) => {logger.info(metricContext.testId, `Icinga check result sent: ${JSON.stringify(response.data)}`); return metricContext;})
         .catch((error => {logger.error(metricContext.testId, `error sending Icinga check result: ${error}`); return metricContext;}));

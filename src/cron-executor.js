@@ -7,6 +7,7 @@ const tester = require('./synthetic-monitoring')
 const appInsights = require("applicationinsights");
 const process = require("process");
 const availabilityPrefix = process.env.AVAILABILITY_PREFIX
+const icingaIntegration = process.env.ICINGA_INTEGRATION_ENABLED === 'true' ? true : false
 const location = process.env.LOCATION
 
 let telemetryClient;
@@ -63,7 +64,7 @@ async function execute() {
    // call tester with a "keep all" filter
    await tester.runMonitoring(
      filterKeepAll,
-     utils.appInsightAndIcingaSender(telemetryClient, axios),
+     icingaIntegration ? utils.appInsightAndIcingaSender(telemetryClient, axios) : utils.eventAndTelemetrySender(telemetryClient),
      utils.cronOnSuccess(telemetryClient, successMonitoringEvent),
      utils.cronOnError(telemetryClient, failedMonitoringEvent)
    );
