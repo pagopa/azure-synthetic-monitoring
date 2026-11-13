@@ -2,12 +2,16 @@ const constants = require('./const')
 const statics = require('./statics')
 const logger = require('./logger')
 
+const http = require ('http')
+const https = require ('https')
+
 
 module.exports = {
     trackSelfAvailabilityEvent,
     eventSender,
     telemetrySender,
     eventAndTelemetrySender,
+    appInsightAndIcingaSender,
     checkApi,
     logSender,
     logSuccess,
@@ -118,6 +122,61 @@ function eventAndTelemetrySender(client){
 }
 
 
+/**
+ * Creates a sender that sequentially sends an event and availability telemetry
+ * to Application Insights, then sends a check result to Icinga.
+ * @param {TelemetryClient} telemetryClient Application Insights telemetry client
+ * @param {Axios} httpClient HTTP client used to send the Icinga check result
+ * @returns {function} An async function that accepts and returns the metric context
+ */
+function appInsightAndIcingaSender(telemetryClient, httpClient) {
+  return async function (metricContext) {
+    const contextAfterEvent = await eventSender(telemetryClient)(metricContext);
+    const contextAfterTelemetry = await telemetrySender(telemetryClient)(contextAfterEvent);
+    try {
+      return await icingaSender(contextAfterTelemetry, httpClient);
+    } catch (error) {
+      logger.error(metricContext.testId, `error in icingaSender: ${error}`);
+      return contextAfterTelemetry;
+    }
+  }
+}
+
+/**
+ * Sends a check result to Icinga.
+ * @param {object} metricContext The metric context used for logging
+ * @param {Axios} client HTTP client used to post the check result
+ * @returns {Promise<object>} The metric context
+ */
+async function icingaSender(metricContext, client){
+    const payload = {
+      type: 'Service',
+      filter: `node.name=="aca" && process.name=="${metricContext.monitoringConfiguration.appName}-${metricContext.monitoringConfiguration.apiName}-${metricContext.monitoringConfiguration.type}"`, // fixme configurare filtro su nome host e process
+      exit_status: metricContext.apiMetrics.success ? 0 : 1,
+      plugin_output: metricContext.baseEventData.properties.message || 'No message provided',
+      performance_data: [`duration=${metricContext.apiMetrics.duration/1000}s;3;8`], //fixme cosa sono i valori dopo la duration?
+      check_source: `${metricContext.monitoringConfiguration.appName}-${metricContext.monitoringConfiguration.apiName}-${metricContext.monitoringConfiguration.type}`,
+      check_command: `synthetic on ${metricContext.monitoringConfiguration.url}`,
+      ttl: 300 //fixme mettere la frequrenza di esecuzione del cron + margine di sicurezza
+    };
+
+    return client({
+            method: "post",
+            url: 'https://icinga.internal.dev.platform.pagopa.it:5665/v1/actions/process-check-result', //fixme mettere url in config
+            data: payload,
+            headers: {
+                Accept: 'application/json'
+            },
+            auth: {
+              username: 'terraform', //fixme usare utente dedicato?
+              password: process.env.ICINGA_PASSWORD
+            },
+            httpAgent: new http.Agent({ rejectUnauthorized: false }),
+            httpsAgent: new https.Agent({ rejectUnauthorized: false })
+    })
+        .then((response) => {logger.info(metricContext.testId, `Icinga check result sent: ${JSON.stringify(response.data)}`); return metricContext;})
+        .catch((error => {logger.error(metricContext.testId, `error sending Icinga check result: ${error}`); return metricContext;}));
+}
 
 /**
  * calls the configured api and checks the response, populating the metric context accordingly
