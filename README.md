@@ -155,8 +155,33 @@ When checking the certificate, the suffix `-cert` will be appended to the "runLo
 | `LOCATION`                        | region name where this job is run                                                                     | yes                 | -         |
 | `CERT_VALIDITY_RANGE_DAYS`        | number of days before the expiration date of a certificate over which the check is considered success | yes                 | -         |
 | `LOG_LEVEL`                       | logging verbosity. accepted values: `DEBUG`, `INFO`, `ERROR`                                          | no                  | `INFO`    |
-| `ICINGA_PASSWORD`                 | password used for icinga integration                                                                  | no                  | -         |
-| `ICINGA_INTEGRATION_ENABLED`      | enables icinga integration                                                                            | no                  | false     |
+| `ICINGA_INTEGRATION_ENABLED`      | enables the icinga integration (cron mode only). `true` to enable                                     | no                  | `false`   |
+| `ICINGA_API_URL`                  | icinga api base url, e.g. `https://<icinga-ip>:5665`                                                  | icinga enabled only | -         |
+| `ICINGA_USER`                     | icinga api user                                                                                       | no                  | synthetic |
+| `ICINGA_PASSWORD`                 | icinga api user password                                                                              | icinga enabled only | -         |
+| `ICINGA_HOST`                     | icinga host holding the synthetic services                                                            | no                  | synthetic |
+| `ICINGA_CA_CERT`                  | PEM of the icinga CA (`\n` literals accepted). when unset the system CAs are used                     | no                  | -         |
+| `ICINGA_TLS_SERVERNAME`           | name verified on the icinga api certificate instead of the url host (the VM short hostname)           | no                  | -         |
+
+## Icinga integration
+
+When `ICINGA_INTEGRATION_ENABLED=true` (cron mode), after sending events and availability to Application Insights
+each test publishes its result on Icinga with the `process-check-result` action on the service
+`<ICINGA_HOST>!<appName>-<apiName>-<type>`:
+
+| outcome                                  | exit status |
+|------------------------------------------|-------------|
+| api check ok (and certificate ok/not checked) | 0 OK        |
+| api check ok, certificate check failed   | 1 WARNING   |
+| api check failed                         | 2 CRITICAL  |
+
+The duration is sent as performance data, with `durationLimit` as critical threshold.
+
+- the Icinga host and services must already exist
+- the Icinga api is called with a dedicated http client: TLS verification is always on. The api certificate is issued by the
+  Icinga CA for the VM short hostname: set `ICINGA_CA_CERT` (`/var/lib/icinga2/certs/ca.crt`) and `ICINGA_TLS_SERVERNAME`
+- Icinga errors are only logged: they never affect the Application Insights flow
+- if the Icinga configuration is incomplete the integration is disabled and an error is logged at startup
 
 ## Deploy
 

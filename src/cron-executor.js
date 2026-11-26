@@ -1,13 +1,12 @@
 // modules
 const utils = require('./utils')
 const logger = require('./logger')
-const axios = require('axios');
+const icinga = require('./icinga')
 
 const tester = require('./synthetic-monitoring')
 const appInsights = require("applicationinsights");
 const process = require("process");
 const availabilityPrefix = process.env.AVAILABILITY_PREFIX
-const icingaIntegration = process.env.ICINGA_INTEGRATION_ENABLED === 'true' ? true : false
 const location = process.env.LOCATION
 
 let telemetryClient;
@@ -28,6 +27,19 @@ try {
 } catch (error) {
   logger.error(`Failed to initialize Application Insights: ${error.message}`);
   throw error;
+}
+
+let icingaConfig = null;
+let icingaClient = null;
+if (process.env.ICINGA_INTEGRATION_ENABLED === 'true') {
+  try {
+    icingaConfig = icinga.readConfig();
+    icingaClient = icinga.createClient(icingaConfig);
+    logger.info(`Icinga integration enabled: ${icingaConfig.apiUrl}, host ${icingaConfig.host}, user ${icingaConfig.user}`);
+  } catch (error) {
+    // the synthetic tests and Application Insights keep working without icinga
+    logger.error(`Icinga integration disabled: ${error.message}`);
+  }
 }
 
 //constants
@@ -64,7 +76,7 @@ async function execute() {
    // call tester with a "keep all" filter
    await tester.runMonitoring(
      filterKeepAll,
-     icingaIntegration ? utils.appInsightAndIcingaSender(telemetryClient, axios) : utils.eventAndTelemetrySender(telemetryClient),
+     icingaClient ? utils.appInsightAndIcingaSender(telemetryClient, icingaClient, icingaConfig.host) : utils.eventAndTelemetrySender(telemetryClient),
      utils.cronOnSuccess(telemetryClient, successMonitoringEvent),
      utils.cronOnError(telemetryClient, failedMonitoringEvent)
    );
