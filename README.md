@@ -162,6 +162,8 @@ When checking the certificate, the suffix `-cert` will be appended to the "runLo
 | `ICINGA_HOST`                     | icinga host holding the synthetic services                                                            | no                  | synthetic |
 | `ICINGA_CA_CERT`                  | PEM of the icinga CA (`\n` literals accepted). when unset the system CAs are used                     | no                  | -         |
 | `ICINGA_TLS_SERVERNAME`           | name verified on the icinga api certificate instead of the url host (the VM short hostname)           | no                  | -         |
+| `BP_API_URL`                      | bp-api base url on the icinga VM, e.g. `http://<icinga-ip>:8080`. when unset the business process is not updated | no        | -         |
+| `ICINGA_BP`                       | name of the icinga business process (file `<name>.conf`) holding the synthetic nodes. when missing with `BP_API_URL` set, the business process update is disabled and an error is logged at startup | with `BP_API_URL` | - |
 
 ## Icinga integration
 
@@ -192,6 +194,24 @@ The duration is sent as performance data, with `durationLimit` as critical thres
 - every send is logged with the state and output sent and the Icinga response code
 - Icinga errors are only logged: they never affect the Application Insights flow
 - if the Icinga configuration is incomplete the integration is disabled and an error is logged at startup
+
+### Business process
+
+When `BP_API_URL` is also set, every run (after creating host and services, before the tests) calls the bp-api on the
+Icinga VM once:
+
+```
+POST <BP_API_URL>/business-process/<ICINGA_BP>/block/synthetic
+{ "host": "<ICINGA_HOST>", "blocks": [ { "domain": "<tags.domain>", "name": "<appName>-<apiName>-<type>" } ] }
+```
+
+The bp-api rewrites the `synthetic` section of the business process, defining for each domain the node
+`synthetic_<domain>` as the AND of its synthetic services; the domain nodes written by Terraform reference it.
+
+- only the tests with the `domain` tag are included; the domain is sanitized like Terraform does (characters outside
+  `[A-Za-z0-9_.-]` become `_`), so it must match the `domain` tag of the Azure resources
+- without any test with the `domain` tag the bp-api is not called (it rejects an empty list)
+- errors are only logged: the tests run anyway
 
 ## Deploy
 

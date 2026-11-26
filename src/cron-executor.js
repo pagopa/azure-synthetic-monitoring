@@ -2,6 +2,7 @@
 const utils = require('./utils')
 const logger = require('./logger')
 const icinga = require('./icinga')
+const businessProcess = require('./business-process')
 
 const tester = require('./synthetic-monitoring')
 const appInsights = require("applicationinsights");
@@ -42,6 +43,23 @@ if (process.env.ICINGA_INTEGRATION_ENABLED === 'true') {
   }
 }
 
+let bpConfig = null;
+let bpClient = null;
+if (icingaClient) {
+  try {
+    bpConfig = businessProcess.readConfig();
+    if (bpConfig) {
+      bpClient = businessProcess.createClient(bpConfig);
+      logger.info(`Icinga business process update enabled: ${bpConfig.apiUrl}, business process ${bpConfig.bp}`);
+    } else {
+      logger.info("Icinga business process update disabled: BP_API_URL not set");
+    }
+  } catch (error) {
+    // host, services and check results keep working without the business process
+    logger.error(`Icinga business process update disabled: ${error.message}`);
+  }
+}
+
 //constants
 const successMonitoringEvent = {
   id: `${availabilityPrefix}-monitoring-function`,
@@ -79,7 +97,7 @@ async function execute() {
      icingaClient ? utils.appInsightAndIcingaSender(telemetryClient, icingaClient, icingaConfig.host) : utils.eventAndTelemetrySender(telemetryClient),
      utils.cronOnSuccess(telemetryClient, successMonitoringEvent),
      utils.cronOnError(telemetryClient, failedMonitoringEvent),
-     icingaClient ? (configurations) => icinga.ensureHostAndServices(configurations, icingaClient, icingaConfig.host) : undefined
+     icingaClient ? icingaBeforeTests : undefined
    );
 
    // Wait a bit for SDK to queue telemetry, then flush
@@ -102,6 +120,19 @@ async function execute() {
       resolve();
     });
    });
+}
+
+
+/**
+ * prepares icinga before the tests: host and services first, so that the check results find them,
+ * then the synthetic nodes of the business process. both never reject
+ * @param {object[]} configurations configurations about to be tested
+ */
+async function icingaBeforeTests(configurations) {
+  await icinga.ensureHostAndServices(configurations, icingaClient, icingaConfig.host);
+  if (bpClient) {
+    await businessProcess.updateBusinessProcess(configurations, bpClient, bpConfig.bp, icingaConfig.host);
+  }
 }
 
 
