@@ -169,11 +169,15 @@ When `ICINGA_INTEGRATION_ENABLED=true` (cron mode), before the tests start the I
 `<appName>-<apiName>-<type>` for each configuration are created, if missing. Then, after sending events and availability
 to Application Insights, each test publishes its result on Icinga with the `process-check-result` action on its service:
 
-| outcome                                       | exit status | plugin output                         |
-|-----------------------------------------------|-------------|---------------------------------------|
-| api check ok (and certificate ok/not checked) | 0 OK        | `OK - <url>`                          |
-| api check ok, certificate check failed        | 1 WARNING   | `KO certificate - <url> - <cert error>` |
-| api check failed                              | 2 CRITICAL  | `KO - <url> - <api error>`            |
+| outcome                                       | exit status | plugin output                                                          |
+|-----------------------------------------------|-------------|------------------------------------------------------------------------|
+| api check ok (and certificate ok/not checked) | 0 OK        | `OK - <url>`, then `certificate OK`                                    |
+| api check ok, certificate check failed        | 1 WARNING   | `KO certificate - <url> - <cert error>`                                |
+| api check failed                              | 2 CRITICAL  | `KO - <url> - <api error>`, then `certificate OK` or `certificate KO[ - <cert error>]` |
+
+The certificate outcome is on a second line (Icinga long output, shown in the service detail, not in the lists) and only
+when `checkCertificate` is enabled; on api failure the certificate error is omitted when equal to the api one
+(e.g. both timed out).
 
 The duration is sent as performance data, with `durationLimit` as critical threshold.
 

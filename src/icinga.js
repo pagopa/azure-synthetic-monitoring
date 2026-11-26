@@ -159,23 +159,40 @@ function displayUrl(url) {
 
 /**
  * plugin output shown on icinga:
- *   OK - <url>
- *   KO - <url> - <api error>                  (CRITICAL)
- *   KO certificate - <url> - <cert error>     (WARNING)
+ *   OK - <url>[\ncertificate OK]
+ *   KO - <url> - <api error>[\ncertificate OK | \ncertificate KO[ - <cert error>]]   (CRITICAL)
+ *   KO certificate - <url> - <cert error>                                           (WARNING)
+ * the certificate outcome is reported only when the certificate is checked, on a second line
+ * (icinga long output: the lists show only the first line). its error is omitted when equal
+ * to the api one (e.g. both timed out)
  * @param {object} metricContext
  * @param {number} status exit status, as returned by exitStatus
  * @returns {string}
  */
 function pluginOutput(metricContext, status) {
     const url = displayUrl(metricContext.monitoringConfiguration.url)
-    if (status === EXIT_OK) {
-        return `OK - ${url}`
-    }
     if (status === EXIT_WARNING) {
         return `KO certificate - ${url} - ${metricContext.certMetrics.message || 'check failed'}`
     }
-    const apiMetrics = metricContext.apiMetrics || {}
-    return `KO - ${url} - ${apiMetrics.message || 'no message provided'}`
+    if (status === EXIT_OK) {
+        return `OK - ${url}${certificateSuffix(metricContext)}`
+    }
+    const apiMessage = (metricContext.apiMetrics || {}).message
+    return `KO - ${url} - ${apiMessage || 'no message provided'}${certificateSuffix(metricContext, apiMessage)}`
+}
+
+
+function certificateSuffix(metricContext, apiMessage) {
+    const certMetrics = metricContext.certMetrics
+    if (!metricContext.monitoringConfiguration.checkCertificate || certMetrics == null || typeof certMetrics.success !== 'boolean') {
+        return ''
+    }
+    if (certMetrics.success) {
+        return '\ncertificate OK'
+    }
+    return certMetrics.message && certMetrics.message !== apiMessage
+        ? `\ncertificate KO - ${certMetrics.message}`
+        : '\ncertificate KO'
 }
 
 
@@ -217,7 +234,8 @@ function checkResultPayload(metricContext, host) {
  */
 async function sendCheckResult(metricContext, client, host) {
     const payload = checkResultPayload(metricContext, host)
-    const sent = `${STATUS_LABEL[payload.exit_status]} "${payload.plugin_output}"`
+    // new lines escaped: one log line per send
+    const sent = `${STATUS_LABEL[payload.exit_status]} "${payload.plugin_output.replace(/\n/g, '\\n')}"`
     try {
         const response = await client.post('/actions/process-check-result', payload)
         const results = response.data && response.data.results

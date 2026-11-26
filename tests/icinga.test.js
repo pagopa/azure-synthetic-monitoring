@@ -129,7 +129,7 @@ describe('checkResultPayload tests', () => {
             type: 'Service',
             service: 'synthetic!myApp-myApi-aks',
             exit_status: 0,
-            plugin_output: 'OK - https://myhost.com/path',
+            plugin_output: 'OK - https://myhost.com/path\ncertificate OK',
             check_source: 'synthetic-monitoring',
             performance_data: ['duration=1.234s;;10']
         })
@@ -144,7 +144,7 @@ describe('checkResultPayload tests', () => {
     test('omits perfdata without duration and handles missing message', () => {
         const payload = icinga.checkResultPayload(metricContext({ apiMetrics: { success: false } }), 'synthetic')
         expect(payload.exit_status).toBe(2)
-        expect(payload.plugin_output).toBe('KO - https://myhost.com/path - no message provided')
+        expect(payload.plugin_output).toBe('KO - https://myhost.com/path - no message provided\ncertificate OK')
         expect(payload.performance_data).toBeUndefined()
     })
 
@@ -159,7 +159,7 @@ describe('checkResultPayload tests', () => {
 describe('plugin output tests', () => {
     test('reports the api error with the url', () => {
         const payload = icinga.checkResultPayload(metricContext({ apiMetrics: { success: false, message: 'timeout of 10000ms exceeded' } }), 'synthetic')
-        expect(payload.plugin_output).toBe('KO - https://myhost.com/path - timeout of 10000ms exceeded')
+        expect(payload.plugin_output).toBe('KO - https://myhost.com/path - timeout of 10000ms exceeded\ncertificate OK')
     })
 
     test('does not repeat the certificate error when the api check fails', () => {
@@ -168,14 +168,37 @@ describe('plugin output tests', () => {
             certMetrics: { success: false, message: 'timeout of 10000ms exceeded' }
         }), 'synthetic')
         expect(payload.exit_status).toBe(2)
-        expect(payload.plugin_output).toBe('KO - https://myhost.com/path - timeout of 10000ms exceeded')
+        expect(payload.plugin_output).toBe('KO - https://myhost.com/path - timeout of 10000ms exceeded\ncertificate KO')
+    })
+
+    test('reports a different certificate error when the api check fails', () => {
+        const payload = icinga.checkResultPayload(metricContext({
+            apiMetrics: { success: false, message: 'status code 503 not valid: Service Temporarily Unavailable' },
+            certMetrics: { success: false, message: 'certificate expiring in 3 days' }
+        }), 'synthetic')
+        expect(payload.plugin_output).toBe('KO - https://myhost.com/path - status code 503 not valid: Service Temporarily Unavailable\ncertificate KO - certificate expiring in 3 days')
+    })
+
+    test('no certificate outcome when the certificate is not checked', () => {
+        const ok = metricContext()
+        ok.monitoringConfiguration.checkCertificate = false
+        expect(icinga.checkResultPayload(ok, 'synthetic').plugin_output).toBe('OK - https://myhost.com/path')
+
+        const ko = metricContext({ apiMetrics: { success: false, message: 'boom' } })
+        ko.monitoringConfiguration.checkCertificate = false
+        expect(icinga.checkResultPayload(ko, 'synthetic').plugin_output).toBe('KO - https://myhost.com/path - boom')
+    })
+
+    test('no certificate outcome when the certificate check did not run', () => {
+        const context = metricContext({ apiMetrics: { success: false, message: 'boom' }, certMetrics: { domain: 'myhost.com', checkCert: true } })
+        expect(icinga.checkResultPayload(context, 'synthetic').plugin_output).toBe('KO - https://myhost.com/path - boom')
     })
 
     test('keeps the query string and removes embedded credentials', () => {
         const context = metricContext()
         context.monitoringConfiguration.url = 'https://user:secret@api.host/shared/statuspage/v1/info?product=bizevents'
         const payload = icinga.checkResultPayload(context, 'synthetic')
-        expect(payload.plugin_output).toBe('OK - https://api.host/shared/statuspage/v1/info?product=bizevents')
+        expect(payload.plugin_output).toBe('OK - https://api.host/shared/statuspage/v1/info?product=bizevents\ncertificate OK')
     })
 })
 
@@ -193,7 +216,7 @@ describe('sendCheckResult tests', () => {
             exit_status: 0
         }))
         expect(logger.info).toHaveBeenCalledWith(context.testId,
-            'icinga check result sent for synthetic!myApp-myApi-aks: OK "OK - https://myhost.com/path", icinga code 200')
+            'icinga check result sent for synthetic!myApp-myApi-aks: OK "OK - https://myhost.com/path\\ncertificate OK", icinga code 200')
     })
 
     test('logs the sent state also on error', async () => {
@@ -203,7 +226,7 @@ describe('sendCheckResult tests', () => {
         await icinga.sendCheckResult(context, client, 'synthetic')
 
         expect(logger.error).toHaveBeenCalledWith(context.testId,
-            'error sending icinga check result for synthetic!myApp-myApi-aks: CRITICAL "KO - https://myhost.com/path - boom", connect ECONNREFUSED')
+            'error sending icinga check result for synthetic!myApp-myApi-aks: CRITICAL "KO - https://myhost.com/path - boom\\ncertificate OK", connect ECONNREFUSED')
     })
 
     test('logs status and body on http error without rejecting', async () => {
