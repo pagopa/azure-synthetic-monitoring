@@ -169,17 +169,18 @@ When `ICINGA_INTEGRATION_ENABLED=true` (cron mode), after sending events and ava
 each test publishes its result on Icinga with the `process-check-result` action on the service
 `<ICINGA_HOST>!<appName>-<apiName>-<type>`:
 
-| outcome                                  | exit status |
-|------------------------------------------|-------------|
-| api check ok (and certificate ok/not checked) | 0 OK        |
-| api check ok, certificate check failed   | 1 WARNING   |
-| api check failed                         | 2 CRITICAL  |
+| outcome                                       | exit status | plugin output                         |
+|-----------------------------------------------|-------------|---------------------------------------|
+| api check ok (and certificate ok/not checked) | 0 OK        | `OK - <url>`                          |
+| api check ok, certificate check failed        | 1 WARNING   | `KO certificate - <url> - <cert error>` |
+| api check failed                              | 2 CRITICAL  | `KO - <url> - <api error>`            |
 
 The duration is sent as performance data, with `durationLimit` as critical threshold.
 
 - the Icinga host and services must already exist
 - the Icinga api is called with a dedicated http client: TLS verification is always on. The api certificate is issued by the
   Icinga CA for the VM short hostname: set `ICINGA_CA_CERT` (`/var/lib/icinga2/certs/ca.crt`) and `ICINGA_TLS_SERVERNAME`
+- every send is logged with the state and output sent and the Icinga response code
 - Icinga errors are only logged: they never affect the Application Insights flow
 - if the Icinga configuration is incomplete the integration is disabled and an error is logged at startup
 

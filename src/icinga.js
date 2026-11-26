@@ -131,6 +131,45 @@ function certFailed(metricContext) {
 
 
 /**
+ * url of the test without credentials, if any were embedded in it
+ * @param {string} url
+ * @returns {string}
+ */
+function displayUrl(url) {
+    try {
+        const parsed = new URL(url)
+        parsed.username = ''
+        parsed.password = ''
+        return parsed.toString()
+    } catch (error) {
+        return 'invalid url'
+    }
+}
+
+
+/**
+ * plugin output shown on icinga:
+ *   OK - <url>
+ *   KO - <url> - <api error>                  (CRITICAL)
+ *   KO certificate - <url> - <cert error>     (WARNING)
+ * @param {object} metricContext
+ * @param {number} status exit status, as returned by exitStatus
+ * @returns {string}
+ */
+function pluginOutput(metricContext, status) {
+    const url = displayUrl(metricContext.monitoringConfiguration.url)
+    if (status === EXIT_OK) {
+        return `OK - ${url}`
+    }
+    if (status === EXIT_WARNING) {
+        return `KO certificate - ${url} - ${metricContext.certMetrics.message || 'check failed'}`
+    }
+    const apiMetrics = metricContext.apiMetrics || {}
+    return `KO - ${url} - ${apiMetrics.message || 'no message provided'}`
+}
+
+
+/**
  * builds the body of the process-check-result action
  * @param {object} metricContext
  * @param {string} host icinga host holding the synthetic services
@@ -140,11 +179,7 @@ function checkResultPayload(metricContext, host) {
     const configuration = metricContext.monitoringConfiguration
     const status = exitStatus(metricContext)
     const apiMetrics = metricContext.apiMetrics || {}
-
-    let output = `${STATUS_LABEL[status]} - ${apiMetrics.message || 'no message provided'}`
-    if (certFailed(metricContext)) {
-        output += ` (certificate: ${metricContext.certMetrics.message || 'check failed'})`
-    }
+    const output = pluginOutput(metricContext, status)
 
     const payload = {
         type: 'Service',
@@ -172,13 +207,16 @@ function checkResultPayload(metricContext, host) {
  */
 async function sendCheckResult(metricContext, client, host) {
     const payload = checkResultPayload(metricContext, host)
+    const sent = `${STATUS_LABEL[payload.exit_status]} "${payload.plugin_output}"`
     try {
         const response = await client.post('/actions/process-check-result', payload)
-        logger.info(metricContext.testId, `icinga check result sent for ${payload.service}: ${JSON.stringify(response.data)}`)
+        const results = response.data && response.data.results
+        const code = Array.isArray(results) && results.length > 0 ? results[0].code : response.status
+        logger.info(metricContext.testId, `icinga check result sent for ${payload.service}: ${sent}, icinga code ${code}`)
     } catch (error) {
         // only status and body: the error object holds the request config, credentials included
         const detail = error.response ? `${error.response.status} ${JSON.stringify(error.response.data)}` : error.message
-        logger.error(metricContext.testId, `error sending icinga check result for ${payload.service}: ${detail}`)
+        logger.error(metricContext.testId, `error sending icinga check result for ${payload.service}: ${sent}, ${detail}`)
     }
     return metricContext
 }
