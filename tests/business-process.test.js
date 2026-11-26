@@ -79,7 +79,8 @@ describe('updateBusinessProcess tests', () => {
                 { domain: 'ecommerce', name: 'checkout-status-apim' }
             ]
         })
-        expect(logger.info).toHaveBeenCalledWith('business process pagoPa_Platform updated: 2 services in 2 domains (bizevents, ecommerce), bp-api code 200')
+        expect(logger.info).toHaveBeenCalledWith('business process pagoPa_Platform: sending 2 services in 2 domains (bizevents, ecommerce)')
+        expect(logger.info).toHaveBeenCalledWith('business process pagoPa_Platform updated, bp-api code 200')
     })
 
     test('not called without blocks: the bp-api rejects an empty list', async () => {

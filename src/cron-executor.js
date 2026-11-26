@@ -36,7 +36,7 @@ if (process.env.ICINGA_INTEGRATION_ENABLED === 'true') {
   try {
     icingaConfig = icinga.readConfig();
     icingaClient = icinga.createClient(icingaConfig);
-    logger.info(`Icinga integration enabled: ${icingaConfig.apiUrl}, host ${icingaConfig.host}, user ${icingaConfig.user}`);
+    logger.debug(`Icinga integration enabled: ${icingaConfig.apiUrl}, host ${icingaConfig.host}, user ${icingaConfig.user}`);
   } catch (error) {
     // the synthetic tests and Application Insights keep working without icinga
     logger.error(`Icinga integration disabled: ${error.message}`);
@@ -50,9 +50,9 @@ if (icingaClient) {
     bpConfig = businessProcess.readConfig();
     if (bpConfig) {
       bpClient = businessProcess.createClient(bpConfig);
-      logger.info(`Icinga business process update enabled: ${bpConfig.apiUrl}, business process ${bpConfig.bp}`);
+      logger.debug(`Icinga business process update enabled: ${bpConfig.apiUrl}, business process ${bpConfig.bp}`);
     } else {
-      logger.info("Icinga business process update disabled: BP_API_URL not set");
+      logger.debug("Icinga business process update disabled: BP_API_URL not set");
     }
   } catch (error) {
     // host, services and check results keep working without the business process
@@ -91,14 +91,19 @@ module.exports = {
  * @returns {Promise<void>}
  */
 async function execute() {
+   const icingaStats = icinga.createStats();
    // call tester with a "keep all" filter
    await tester.runMonitoring(
      filterKeepAll,
-     icingaClient ? utils.appInsightAndIcingaSender(telemetryClient, icingaClient, icingaConfig.host) : utils.eventAndTelemetrySender(telemetryClient),
+     icingaClient ? utils.appInsightAndIcingaSender(telemetryClient, icingaClient, icingaConfig.host, icingaStats) : utils.eventAndTelemetrySender(telemetryClient),
      utils.cronOnSuccess(telemetryClient, successMonitoringEvent),
      utils.cronOnError(telemetryClient, failedMonitoringEvent),
      icingaClient ? icingaBeforeTests : undefined
    );
+
+   if (icingaClient) {
+     logger.info(`icinga check results to host ${icingaConfig.host}: ${icinga.statsSummary(icingaStats)}`);
+   }
 
    // Wait a bit for SDK to queue telemetry, then flush
    await new Promise(resolve => setTimeout(resolve, 100));
@@ -133,6 +138,7 @@ async function icingaBeforeTests(configurations) {
   if (bpClient) {
     await businessProcess.updateBusinessProcess(configurations, bpClient, bpConfig.bp, icingaConfig.host);
   }
+  logger.info(`icinga check results: sending ${configurations.length} results to host ${icingaConfig.host}`);
 }
 
 

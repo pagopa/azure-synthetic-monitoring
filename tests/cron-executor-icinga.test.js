@@ -79,12 +79,13 @@ describe('cron-executor icinga integration', () => {
         await tester.runMonitoring.mock.calls[0][4](configurations);
 
         expect(order).toEqual(['icinga', 'bp']);
+        expect(logger.info).toHaveBeenCalledWith('icinga check results: sending 1 results to host my-host');
         expect(icinga.ensureHostAndServices).toHaveBeenCalledWith(configurations, expect.anything(), 'my-host');
         const [, client, bp, host] = businessProcess.updateBusinessProcess.mock.calls[0];
         expect(client.defaults.baseURL).toBe('http://10.0.0.4:8080');
         expect(bp).toBe('my-bp');
         expect(host).toBe('my-host');
-        expect(logger.info).toHaveBeenCalledWith('Icinga business process update enabled: http://10.0.0.4:8080, business process my-bp');
+        expect(logger.debug).toHaveBeenCalledWith('Icinga business process update enabled: http://10.0.0.4:8080, business process my-bp');
     });
 
     test('the business process is not updated without BP_API_URL', async () => {
@@ -97,7 +98,7 @@ describe('cron-executor icinga integration', () => {
 
         expect(icinga.ensureHostAndServices).toHaveBeenCalled();
         expect(businessProcess.updateBusinessProcess).not.toHaveBeenCalled();
-        expect(logger.info).toHaveBeenCalledWith('Icinga business process update disabled: BP_API_URL not set');
+        expect(logger.debug).toHaveBeenCalledWith('Icinga business process update disabled: BP_API_URL not set');
     });
 
     test('the business process is not updated without ICINGA_BP, icinga keeps working', async () => {
@@ -112,6 +113,29 @@ describe('cron-executor icinga integration', () => {
         expect(icinga.ensureHostAndServices).toHaveBeenCalled();
         expect(businessProcess.updateBusinessProcess).not.toHaveBeenCalled();
         expect(logger.error).toHaveBeenCalledWith('Icinga business process update disabled: missing business process configuration: ICINGA_BP');
+    });
+
+    test('logs the summary of the check results sent at the end of the run', async () => {
+        const { cronExecutor, tester, utils, logger } = loadCronExecutor(ICINGA_ENV);
+        tester.runMonitoring.mockImplementation(async () => {
+            const stats = utils.appInsightAndIcingaSender.mock.calls[0][3];
+            stats.sent = 2;
+            stats.states.OK = 1;
+            stats.states.CRITICAL = 1;
+            stats.failed = 1;
+        });
+
+        await cronExecutor.execute();
+
+        expect(logger.info).toHaveBeenCalledWith('icinga check results to host my-host: 2 sent (OK 1, WARNING 0, CRITICAL 1), 1 failed');
+    });
+
+    test('no icinga summary when the integration is disabled', async () => {
+        const { cronExecutor, logger } = loadCronExecutor({ ICINGA_INTEGRATION_ENABLED: 'false' });
+
+        await cronExecutor.execute();
+
+        expect(logger.info).not.toHaveBeenCalledWith(expect.stringContaining('icinga check results'));
     });
 
     test('falls back to Application Insights only when the icinga configuration is incomplete', async () => {

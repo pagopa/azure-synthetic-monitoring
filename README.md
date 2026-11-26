@@ -191,7 +191,10 @@ The duration is sent as performance data, with `durationLimit` as critical thres
   Services of removed configurations are not deleted
 - the Icinga api is called with a dedicated http client: TLS verification is always on. The api certificate is issued by the
   Icinga CA for the VM short hostname: set `ICINGA_CA_CERT` (`/var/lib/icinga2/certs/ca.crt`) and `ICINGA_TLS_SERVERNAME`
-- every send is logged with the state and output sent and the Icinga response code
+- at `INFO` level each run logs a summary: services existing/created/failed, business process sent and updated,
+  check results about to be sent and, at the end, sent by state and failed
+- with `LOG_LEVEL=DEBUG` every send is also logged with the state and output sent and the Icinga response code, as well as
+  the startup configuration and each created object. Errors are always logged
 - Icinga errors are only logged: they never affect the Application Insights flow
 - if the Icinga configuration is incomplete the integration is disabled and an error is logged at startup
 

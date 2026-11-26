@@ -102,9 +102,10 @@ async function updateBusinessProcess(monitoringConfigurations, client, bp, host)
         return
     }
     const path = `/business-process/${encodeURIComponent(bp)}/block/${TARGET}`
+    logger.info(`business process ${bp}: sending ${body.blocks.length} services in ${domains.size} domains (${[...domains].join(', ')})`)
     try {
         const response = await client.post(path, body)
-        logger.info(`business process ${bp} updated: ${body.blocks.length} services in ${domains.size} domains (${[...domains].join(', ')}), bp-api code ${response.status}`)
+        logger.info(`business process ${bp} updated, bp-api code ${response.status}`)
     } catch (error) {
         const detail = error.response ? `${error.response.status} ${JSON.stringify(error.response.data)}` : error.message
         logger.error(`error updating business process ${bp}: ${detail}`)

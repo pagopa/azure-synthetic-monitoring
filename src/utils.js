@@ -130,10 +130,10 @@ function eventAndTelemetrySender(client){
  * @param {string} icingaHost Icinga host holding the synthetic services
  * @returns {function} An async function that accepts and returns the metric context
  */
-function appInsightAndIcingaSender(telemetryClient, icingaClient, icingaHost) {
+function appInsightAndIcingaSender(telemetryClient, icingaClient, icingaHost, icingaStats) {
   return async function (metricContext) {
     const contextAfterTelemetry = await eventAndTelemetrySender(telemetryClient)(metricContext);
-    return await icinga.sendCheckResult(contextAfterTelemetry, icingaClient, icingaHost);
+    return await icinga.sendCheckResult(contextAfterTelemetry, icingaClient, icingaHost, icingaStats);
   }
 }
 

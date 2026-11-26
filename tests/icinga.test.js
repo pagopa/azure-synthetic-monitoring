@@ -215,7 +215,7 @@ describe('sendCheckResult tests', () => {
             service: 'synthetic!myApp-myApi-aks',
             exit_status: 0
         }))
-        expect(logger.info).toHaveBeenCalledWith(context.testId,
+        expect(logger.debug).toHaveBeenCalledWith(context.testId,
             'icinga check result sent for synthetic!myApp-myApi-aks: OK "OK - https://myhost.com/path\\ncertificate OK", icinga code 200')
     })
 
@@ -405,5 +405,37 @@ describe('ensureHostAndServices tests', () => {
 
         expect(put).toHaveBeenCalledTimes(25)
         expect(maxInFlight).toBeLessThanOrEqual(10)
+    })
+})
+
+
+describe('run stats tests', () => {
+    test('counts sent results by state and failed sends', async () => {
+        const stats = icinga.createStats()
+        const ok = { post: jest.fn().mockResolvedValue({ data: { results: [{ code: 200 }] } }) }
+        const ko = { post: jest.fn().mockRejectedValue(new Error('connect ECONNREFUSED')) }
+
+        await icinga.sendCheckResult(metricContext(), ok, 'synthetic', stats)
+        await icinga.sendCheckResult(metricContext({ certMetrics: { success: false, message: 'expiring' } }), ok, 'synthetic', stats)
+        await icinga.sendCheckResult(metricContext({ apiMetrics: { success: false, message: 'boom' } }), ok, 'synthetic', stats)
+        await icinga.sendCheckResult(metricContext(), ko, 'synthetic', stats)
+
+        expect(stats).toEqual({ sent: 3, failed: 1, states: { OK: 1, WARNING: 1, CRITICAL: 1 } })
+        expect(icinga.statsSummary(stats)).toBe('3 sent (OK 1, WARNING 1, CRITICAL 1), 1 failed')
+    })
+
+    test('stats are optional', async () => {
+        const client = { post: jest.fn().mockResolvedValue({ data: {} }) }
+        await expect(icinga.sendCheckResult(metricContext(), client, 'synthetic')).resolves.toBeDefined()
+    })
+
+    test('appInsightAndIcingaSender passes the stats', async () => {
+        const stats = icinga.createStats()
+        const telemetryClient = { trackEvent: jest.fn(), trackAvailability: jest.fn() }
+        const client = { post: jest.fn().mockResolvedValue({ data: {} }) }
+
+        await utils.appInsightAndIcingaSender(telemetryClient, client, 'synthetic', stats)(metricContext())
+
+        expect(stats.sent).toBe(1)
     })
 })

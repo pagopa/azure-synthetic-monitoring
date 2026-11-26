@@ -30,6 +30,8 @@ module.exports = {
     exitStatus,
     checkResultPayload,
     sendCheckResult,
+    createStats,
+    statsSummary,
     hostAttributes,
     serviceAttributes,
     ensureHostAndServices,
@@ -226,13 +228,34 @@ function checkResultPayload(metricContext, host) {
 
 
 /**
+ * counters of the check results sent in a run, updated by sendCheckResult
+ * @returns {object}
+ */
+function createStats() {
+    return { sent: 0, failed: 0, states: { OK: 0, WARNING: 0, CRITICAL: 0 } }
+}
+
+
+/**
+ * one line summary of the check results sent in a run
+ * @param {object} stats as returned by createStats
+ * @returns {string}
+ */
+function statsSummary(stats) {
+    const states = Object.entries(stats.states).map(([state, count]) => `${state} ${count}`).join(', ')
+    return `${stats.sent} sent (${states}), ${stats.failed} failed`
+}
+
+
+/**
  * publishes the result of a test on icinga. never rejects: errors are logged
  * @param {object} metricContext
  * @param {Axios} client icinga client, as returned by createClient
  * @param {string} host icinga host holding the synthetic services
+ * @param {object} [stats] run counters, as returned by createStats
  * @returns {Promise<object>} the metric context
  */
-async function sendCheckResult(metricContext, client, host) {
+async function sendCheckResult(metricContext, client, host, stats) {
     const payload = checkResultPayload(metricContext, host)
     // new lines escaped: one log line per send
     const sent = `${STATUS_LABEL[payload.exit_status]} "${payload.plugin_output.replace(/\n/g, '\\n')}"`
@@ -240,9 +263,16 @@ async function sendCheckResult(metricContext, client, host) {
         const response = await client.post('/actions/process-check-result', payload)
         const results = response.data && response.data.results
         const code = Array.isArray(results) && results.length > 0 ? results[0].code : response.status
-        logger.info(metricContext.testId, `icinga check result sent for ${payload.service}: ${sent}, icinga code ${code}`)
+        logger.debug(metricContext.testId, `icinga check result sent for ${payload.service}: ${sent}, icinga code ${code}`)
+        if (stats) {
+            stats.sent++
+            stats.states[STATUS_LABEL[payload.exit_status]]++
+        }
     } catch (error) {
         logger.error(metricContext.testId, `error sending icinga check result for ${payload.service}: ${sent}, ${errorDetail(error)}`)
+        if (stats) {
+            stats.failed++
+        }
     }
     return metricContext
 }
@@ -310,7 +340,7 @@ function errorDetail(error) {
 async function createObject(client, path, attrs, label) {
     try {
         await client.put(path, { attrs })
-        logger.info(`icinga ${label} created`)
+        logger.debug(`icinga ${label} created`)
         return true
     } catch (error) {
         if (alreadyExists(error)) {
