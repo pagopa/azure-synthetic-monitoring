@@ -36,6 +36,7 @@ describe('cron-executor icinga integration', () => {
 
         expect(utils.appInsightAndIcingaSender).not.toHaveBeenCalled();
         expect(tester.runMonitoring.mock.calls[0][1]).toBe('appInsightSender');
+        expect(tester.runMonitoring.mock.calls[0][4]).toBeUndefined();
     });
 
     test('uses the icinga sender with the configured host when enabled', async () => {
@@ -52,6 +53,8 @@ describe('cron-executor icinga integration', () => {
         expect(client.defaults.baseURL).toBe('https://icinga:5665/v1');
         expect(host).toBe('my-host');
         expect(tester.runMonitoring.mock.calls[0][1]).toBe('icingaSender');
+        // host and services are created before the tests
+        expect(typeof tester.runMonitoring.mock.calls[0][4]).toBe('function');
     });
 
     test('falls back to Application Insights only when the icinga configuration is incomplete', async () => {
@@ -62,5 +65,6 @@ describe('cron-executor icinga integration', () => {
         expect(utils.appInsightAndIcingaSender).not.toHaveBeenCalled();
         expect(tester.runMonitoring.mock.calls[0][1]).toBe('appInsightSender');
         expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('Icinga integration disabled'));
+        expect(tester.runMonitoring.mock.calls[0][4]).toBeUndefined();
     });
 });

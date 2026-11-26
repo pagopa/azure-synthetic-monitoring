@@ -254,3 +254,133 @@ describe('appInsightAndIcingaSender tests', () => {
         expect(telemetryClient.trackAvailability).toHaveBeenCalled()
     })
 })
+
+
+describe('object attributes tests', () => {
+    test('host is a dummy always UP managed by synthetic', () => {
+        expect(icinga.hostAttributes()).toEqual({
+            check_command: 'dummy',
+            vars: { dummy_state: 0, dummy_text: 'synthetic monitoring', managed_by: 'synthetic' }
+        })
+    })
+
+    test('service goes CRITICAL after 8 minutes without results', () => {
+        const configuration = { ...metricContext().monitoringConfiguration, tags: { domain: 'bizevents' } }
+        expect(icinga.serviceAttributes(configuration)).toEqual({
+            check_command: 'dummy',
+            max_check_attempts: 1,
+            check_interval: 480,
+            retry_interval: 480,
+            vars: {
+                dummy_state: 2,
+                dummy_text: 'no result from synthetic in the last 8 minutes',
+                managed_by: 'synthetic',
+                url: 'https://myhost.com/path',
+                domain: 'bizevents'
+            }
+        })
+    })
+
+    test('service without domain tag has no domain var', () => {
+        const configuration = { ...metricContext().monitoringConfiguration, tags: {} }
+        expect(icinga.serviceAttributes(configuration).vars.domain).toBeUndefined()
+    })
+})
+
+
+describe('ensureHostAndServices tests', () => {
+    const configuration = (appName, apiName, type = 'aks') => ({ appName, apiName, type, url: 'https://myhost.com/path', tags: {} })
+    const notFound = () => Object.assign(new Error('404'), { response: { status: 404, data: { error: 404, status: 'No objects found.' } } })
+    const alreadyExists = () => Object.assign(new Error('500'), {
+        response: { status: 500, data: { results: [{ code: 500, errors: ["Object 'x' already exists."], status: 'Object could not be created.' }] } }
+    })
+
+    function client({ hostExists = true, services = [], put } = {}) {
+        return {
+            get: jest.fn().mockImplementation((path) => {
+                if (path.startsWith('/objects/hosts/')) {
+                    return hostExists ? Promise.resolve({ data: { results: [{ name: 'synthetic' }] } }) : Promise.reject(notFound())
+                }
+                return Promise.resolve({ data: { results: services.map((name) => ({ name: `synthetic!${name}`, attrs: { name } })) } })
+            }),
+            put: put || jest.fn().mockResolvedValue({ data: { results: [{ code: 200 }] } })
+        }
+    }
+
+    test('creates only the missing services, once each', async () => {
+        const c = client({ services: ['app-one-aks'] })
+
+        await icinga.ensureHostAndServices([configuration('app', 'one'), configuration('app', 'two'), configuration('app', 'two')], c, 'synthetic')
+
+        expect(c.get).toHaveBeenCalledWith('/objects/services', { params: { filter: 'host.name=="synthetic"', attrs: 'name' } })
+        expect(c.put).toHaveBeenCalledTimes(1)
+        expect(c.put).toHaveBeenCalledWith('/objects/services/synthetic!app-two-aks', { attrs: expect.objectContaining({ check_interval: 480 }) })
+        expect(logger.info).toHaveBeenCalledWith('icinga host synthetic: 1 services existing, 1 created, 0 failed')
+    })
+
+    test('creates the host when missing, before the services', async () => {
+        const c = client({ hostExists: false })
+
+        await icinga.ensureHostAndServices([configuration('app', 'one')], c, 'synthetic')
+
+        expect(c.put.mock.calls.map((call) => call[0])).toEqual(['/objects/hosts/synthetic', '/objects/services/synthetic!app-one-aks'])
+        expect(c.put.mock.calls[0][1]).toEqual({ attrs: icinga.hostAttributes() })
+    })
+
+    test('an object created meanwhile by another run counts as created', async () => {
+        const c = client({ put: jest.fn().mockRejectedValue(alreadyExists()) })
+
+        await icinga.ensureHostAndServices([configuration('app', 'one')], c, 'synthetic')
+
+        expect(logger.error).not.toHaveBeenCalled()
+        expect(logger.info).toHaveBeenCalledWith('icinga host synthetic: 0 services existing, 1 created, 0 failed')
+    })
+
+    test('services are not created when the host cannot be created', async () => {
+        const c = client({ hostExists: false, put: jest.fn().mockRejectedValue(Object.assign(new Error('403'), { response: { status: 403, data: { status: 'No permission' } } })) })
+
+        await icinga.ensureHostAndServices([configuration('app', 'one')], c, 'synthetic')
+
+        expect(c.put).toHaveBeenCalledTimes(1)
+        expect(logger.error).toHaveBeenCalledWith('error creating icinga host synthetic: 403 {"status":"No permission"}')
+    })
+
+    test('counts failed services and never rejects', async () => {
+        const put = jest.fn()
+            .mockResolvedValueOnce({ data: {} })
+            .mockRejectedValueOnce(new Error('socket hang up'))
+        const c = client({ put })
+
+        await expect(icinga.ensureHostAndServices([configuration('app', 'one'), configuration('app', 'two')], c, 'synthetic')).resolves.toBeUndefined()
+
+        expect(logger.error).toHaveBeenCalledWith('error creating icinga service synthetic!app-two-aks: socket hang up')
+        expect(logger.info).toHaveBeenCalledWith('icinga host synthetic: 0 services existing, 1 created, 1 failed')
+    })
+
+    test('logs and resolves when icinga is unreachable', async () => {
+        const c = { get: jest.fn().mockRejectedValue(new Error('connect ETIMEDOUT')), put: jest.fn() }
+
+        await expect(icinga.ensureHostAndServices([configuration('app', 'one')], c, 'synthetic')).resolves.toBeUndefined()
+
+        expect(c.put).not.toHaveBeenCalled()
+        expect(logger.error).toHaveBeenCalledWith('error reading icinga host synthetic: connect ETIMEDOUT')
+    })
+
+    test('creates the services in batches', async () => {
+        let inFlight = 0
+        let maxInFlight = 0
+        const put = jest.fn().mockImplementation(async () => {
+            inFlight++
+            maxInFlight = Math.max(maxInFlight, inFlight)
+            await new Promise((resolve) => setImmediate(resolve))
+            inFlight--
+            return { data: {} }
+        })
+        const configurations = Array.from({ length: 25 }, (_, i) => configuration('app', `api${i}`))
+
+        await icinga.ensureHostAndServices(configurations, client({ put }), 'synthetic')
+
+        expect(put).toHaveBeenCalledTimes(25)
+        expect(maxInFlight).toBeLessThanOrEqual(10)
+    })
+})

@@ -17,6 +17,12 @@ const EXIT_WARNING = 1
 const EXIT_CRITICAL = 2
 const STATUS_LABEL = { [EXIT_OK]: 'OK', [EXIT_WARNING]: 'WARNING', [EXIT_CRITICAL]: 'CRITICAL' }
 
+// a service without results from synthetic for this long goes CRITICAL: every passive result
+// postpones the next active check (dummy) by check_interval. with the cron every 5 minutes
+// a single missed run turns the service red
+const FRESHNESS_SECONDS = 480
+const MANAGED_BY = 'synthetic'
+
 module.exports = {
     readConfig,
     createClient,
@@ -24,6 +30,10 @@ module.exports = {
     exitStatus,
     checkResultPayload,
     sendCheckResult,
+    hostAttributes,
+    serviceAttributes,
+    ensureHostAndServices,
+    FRESHNESS_SECONDS,
     EXIT_OK,
     EXIT_WARNING,
     EXIT_CRITICAL
@@ -214,9 +224,145 @@ async function sendCheckResult(metricContext, client, host) {
         const code = Array.isArray(results) && results.length > 0 ? results[0].code : response.status
         logger.info(metricContext.testId, `icinga check result sent for ${payload.service}: ${sent}, icinga code ${code}`)
     } catch (error) {
-        // only status and body: the error object holds the request config, credentials included
-        const detail = error.response ? `${error.response.status} ${JSON.stringify(error.response.data)}` : error.message
-        logger.error(metricContext.testId, `error sending icinga check result for ${payload.service}: ${sent}, ${detail}`)
+        logger.error(metricContext.testId, `error sending icinga check result for ${payload.service}: ${sent}, ${errorDetail(error)}`)
     }
     return metricContext
+}
+
+
+/**
+ * attributes of the icinga host holding the synthetic services: always UP,
+ * the state of the synthetic checks is on the services
+ * @returns {object}
+ */
+function hostAttributes() {
+    return {
+        check_command: 'dummy',
+        vars: {
+            dummy_state: 0,
+            dummy_text: 'synthetic monitoring',
+            managed_by: MANAGED_BY
+        }
+    }
+}
+
+
+/**
+ * attributes of the icinga service of a monitoring configuration. the active check is a dummy
+ * returning CRITICAL: it runs only when synthetic sends no result for FRESHNESS_SECONDS
+ * @param {object} monitoringConfiguration
+ * @returns {object}
+ */
+function serviceAttributes(monitoringConfiguration) {
+    const vars = {
+        dummy_state: EXIT_CRITICAL,
+        dummy_text: `no result from synthetic in the last ${FRESHNESS_SECONDS / 60} minutes`,
+        managed_by: MANAGED_BY,
+        url: displayUrl(monitoringConfiguration.url)
+    }
+    const tags = monitoringConfiguration.tags || {}
+    if (tags.domain) {
+        vars.domain = tags.domain
+    }
+    return {
+        check_command: 'dummy',
+        max_check_attempts: 1,
+        check_interval: FRESHNESS_SECONDS,
+        retry_interval: FRESHNESS_SECONDS,
+        vars
+    }
+}
+
+
+function alreadyExists(error) {
+    return Boolean(error.response) && JSON.stringify(error.response.data || '').includes('already exists')
+}
+
+
+function errorDetail(error) {
+    // only status and body: the error object holds the request config, credentials included
+    return error.response ? `${error.response.status} ${JSON.stringify(error.response.data)}` : error.message
+}
+
+
+/**
+ * creates an icinga object. an object that already exists (e.g. created by a concurrent run) is ok
+ * @returns {Promise<boolean>} true when the object exists at the end of the call
+ */
+async function createObject(client, path, attrs, label) {
+    try {
+        await client.put(path, { attrs })
+        logger.info(`icinga ${label} created`)
+        return true
+    } catch (error) {
+        if (alreadyExists(error)) {
+            return true
+        }
+        logger.error(`error creating icinga ${label}: ${errorDetail(error)}`)
+        return false
+    }
+}
+
+
+async function ensureHost(client, host) {
+    try {
+        await client.get(`/objects/hosts/${encodeURIComponent(host)}`, { params: { attrs: 'name' } })
+        return true
+    } catch (error) {
+        if (!error.response || error.response.status !== 404) {
+            logger.error(`error reading icinga host ${host}: ${errorDetail(error)}`)
+            return false
+        }
+    }
+    return createObject(client, `/objects/hosts/${encodeURIComponent(host)}`, hostAttributes(), `host ${host}`)
+}
+
+
+async function existingServices(client, host) {
+    const response = await client.get('/objects/services', {
+        params: { filter: `host.name=="${host}"`, attrs: 'name' }
+    })
+    const results = (response.data && response.data.results) || []
+    return new Set(results.map((result) => result.attrs.name))
+}
+
+
+/**
+ * creates on icinga the host and the services missing for the given configurations.
+ * existing objects are not modified. never rejects: errors are logged and the tests run anyway
+ * (the results of the services that could not be created are rejected by icinga with 404)
+ * @param {object[]} monitoringConfigurations configurations about to be tested
+ * @param {Axios} client icinga client, as returned by createClient
+ * @param {string} host icinga host holding the synthetic services
+ * @returns {Promise<void>}
+ */
+async function ensureHostAndServices(monitoringConfigurations, client, host) {
+    try {
+        if (!await ensureHost(client, host)) {
+            return
+        }
+        const existing = await existingServices(client, host)
+
+        const missing = new Map()
+        for (const configuration of monitoringConfigurations) {
+            const name = serviceName(configuration)
+            if (!existing.has(name) && !missing.has(name)) {
+                missing.set(name, configuration)
+            }
+        }
+
+        let failed = 0
+        const queue = [...missing.entries()]
+        // a few requests at a time: the first run creates all the services
+        for (let i = 0; i < queue.length; i += MAX_SOCKETS) {
+            const outcomes = await Promise.all(queue.slice(i, i + MAX_SOCKETS).map(([name, configuration]) =>
+                createObject(client, `/objects/services/${encodeURIComponent(host)}!${encodeURIComponent(name)}`,
+                    serviceAttributes(configuration), `service ${host}!${name}`)))
+            failed += outcomes.filter((created) => !created).length
+        }
+
+        logger.info(`icinga host ${host}: ${existing.size} services existing, ${missing.size - failed} created, ${failed} failed`)
+    } catch (error) {
+        logger.error(`error preparing icinga host ${host} and services: ${errorDetail(error)}`)
+    }
 }

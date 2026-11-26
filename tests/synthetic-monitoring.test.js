@@ -268,6 +268,67 @@ describe('runMonitoring tests', () => {
   });
 });
 
+describe('runMonitoring beforeTests hook', () => {
+  const entity = (partitionKey) => ({
+    partitionKey, rowKey: 'http', type: 'http', url: 'https://example.com', method: 'GET',
+    checkCertificate: false, durationLimit: 1000, tags: '{"domain":"bizevents"}',
+    body: null, headers: null, expectedCodes: null, bodyCompareStrategy: null, expectedBody: null
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    utils.checkApi.mockImplementation((context) => Promise.resolve(context));
+  });
+
+  test('is called once with the filtered configurations before the tests start', async () => {
+    globalMockListEntities = createAsyncIterable([entity('app-one'), entity('app-two'), entity('other-three')]);
+    const order = [];
+    const beforeTests = jest.fn().mockImplementation(async () => { order.push('hook'); });
+    const sender = jest.fn().mockImplementation(async (context) => { order.push('sender'); return context; });
+    const filter = (configuration) => configuration.appName === 'app';
+
+    await syntheticMonitoring.runMonitoring(filter, sender, jest.fn().mockReturnValue(jest.fn()), jest.fn().mockReturnValue(jest.fn()), beforeTests);
+
+    expect(beforeTests).toHaveBeenCalledTimes(1);
+    const configurations = beforeTests.mock.calls[0][0];
+    expect(configurations.map((c) => c.apiName)).toEqual(['one', 'two']);
+    expect(configurations[0].tags).toEqual({ domain: 'bizevents' });
+    expect(order).toEqual(['hook', 'sender', 'sender']);
+  });
+
+  test('a failing hook does not stop the tests', async () => {
+    globalMockListEntities = createAsyncIterable([entity('app-one')]);
+    const sender = jest.fn().mockImplementation(async (context) => context);
+    const onSuccess = jest.fn().mockReturnValue(jest.fn());
+
+    await syntheticMonitoring.runMonitoring(() => true, sender, onSuccess, jest.fn().mockReturnValue(jest.fn()),
+      jest.fn().mockRejectedValue(new Error('icinga down')));
+
+    expect(sender).toHaveBeenCalledTimes(1);
+    expect(onSuccess).toHaveBeenCalled();
+  });
+
+  test('is not called when no configuration passes the filter', async () => {
+    globalMockListEntities = createAsyncIterable([entity('app-one')]);
+    const beforeTests = jest.fn();
+
+    await syntheticMonitoring.runMonitoring(() => false, jest.fn(), jest.fn().mockReturnValue(jest.fn()), jest.fn().mockReturnValue(jest.fn()), beforeTests);
+
+    expect(beforeTests).not.toHaveBeenCalled();
+  });
+
+  test('parse errors still make the run fail when a hook is awaited', async () => {
+    globalMockListEntities = createAsyncIterable([entity('app-one'), { ...entity('app-two'), tags: 'not json' }]);
+    const onFailure = jest.fn().mockReturnValue(jest.fn());
+
+    await syntheticMonitoring.runMonitoring(() => true, jest.fn().mockImplementation(async (c) => c),
+      jest.fn().mockReturnValue(jest.fn()), onFailure, () => new Promise((resolve) => setTimeout(resolve, 20)));
+
+    expect(onFailure).toHaveBeenCalled();
+  });
+});
+
+
 describe('utils.checkApi integration', () => {
   let mockTableEntity;
 

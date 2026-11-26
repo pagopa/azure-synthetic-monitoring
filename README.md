@@ -165,9 +165,9 @@ When checking the certificate, the suffix `-cert` will be appended to the "runLo
 
 ## Icinga integration
 
-When `ICINGA_INTEGRATION_ENABLED=true` (cron mode), after sending events and availability to Application Insights
-each test publishes its result on Icinga with the `process-check-result` action on the service
-`<ICINGA_HOST>!<appName>-<apiName>-<type>`:
+When `ICINGA_INTEGRATION_ENABLED=true` (cron mode), before the tests start the Icinga host `ICINGA_HOST` and a service
+`<appName>-<apiName>-<type>` for each configuration are created, if missing. Then, after sending events and availability
+to Application Insights, each test publishes its result on Icinga with the `process-check-result` action on its service:
 
 | outcome                                       | exit status | plugin output                         |
 |-----------------------------------------------|-------------|---------------------------------------|
@@ -177,7 +177,12 @@ each test publishes its result on Icinga with the `process-check-result` action 
 
 The duration is sent as performance data, with `durationLimit` as critical threshold.
 
-- the Icinga host and services must already exist
+- the host is a `dummy` always UP; each service is a `dummy` CRITICAL with `check_interval` 8 minutes and
+  `max_check_attempts` 1: every result sent postpones the active check, so a service with no result from synthetic
+  for 8 minutes goes CRITICAL (`no result from synthetic in the last 8 minutes`). Services carry `vars.managed_by = synthetic`,
+  `vars.url` and, when the configuration has the `domain` tag, `vars.domain`
+- existing objects are never modified or deleted: to apply new attributes delete the service, it is recreated by the next run.
+  Services of removed configurations are not deleted
 - the Icinga api is called with a dedicated http client: TLS verification is always on. The api certificate is issued by the
   Icinga CA for the VM short hostname: set `ICINGA_CA_CERT` (`/var/lib/icinga2/certs/ca.crt`) and `ICINGA_TLS_SERVERNAME`
 - every send is logged with the state and output sent and the Icinga response code

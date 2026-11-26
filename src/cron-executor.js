@@ -78,7 +78,8 @@ async function execute() {
      filterKeepAll,
      icingaClient ? utils.appInsightAndIcingaSender(telemetryClient, icingaClient, icingaConfig.host) : utils.eventAndTelemetrySender(telemetryClient),
      utils.cronOnSuccess(telemetryClient, successMonitoringEvent),
-     utils.cronOnError(telemetryClient, failedMonitoringEvent)
+     utils.cronOnError(telemetryClient, failedMonitoringEvent),
+     icingaClient ? (configurations) => icinga.ensureHostAndServices(configurations, icingaClient, icingaConfig.host) : undefined
    );
 
    // Wait a bit for SDK to queue telemetry, then flush

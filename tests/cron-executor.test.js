@@ -170,7 +170,7 @@ describe('cron-executor Application Insights integration scenarios', () => {
     );
   });
 
-  test('runMonitoring receives 4 arguments: filter, sender, onSuccess, onError', async () => {
+  test('runMonitoring receives filter, sender, onSuccess, onError and no hook without icinga', async () => {
     tester.runMonitoring.mockResolvedValue(undefined);
     utils.eventAndTelemetrySender.mockReturnValue(jest.fn());
     utils.cronOnSuccess.mockReturnValue(jest.fn());
@@ -179,11 +179,12 @@ describe('cron-executor Application Insights integration scenarios', () => {
     await cronExecutor.execute();
 
     const args = tester.runMonitoring.mock.calls[0];
-    expect(args.length).toBe(4);
+    expect(args.length).toBe(5);
     expect(typeof args[0]).toBe('function'); // filter
     expect(typeof args[1]).toBe('function'); // sender
     expect(typeof args[2]).toBe('function'); // onSuccess
     expect(typeof args[3]).toBe('function'); // onError
+    expect(args[4]).toBeUndefined(); // beforeTests
   });
 
   test('runMonitoring is awaited (execute returns promise)', async () => {
