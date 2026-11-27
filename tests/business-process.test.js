@@ -18,20 +18,26 @@ describe('readConfig tests', () => {
         expect(businessProcess.readConfig({})).toBeNull()
     })
 
-    test('reads url and business process name', () => {
-        expect(businessProcess.readConfig({ BP_API_URL: 'http://10.0.0.4:8080/', ICINGA_BP: 'my-bp' })).toEqual({ apiUrl: 'http://10.0.0.4:8080', bp: 'my-bp' })
+    test('reads url, business process name and token', () => {
+        expect(businessProcess.readConfig({ BP_API_URL: 'https://icinga.example/bp-api/', ICINGA_BP: 'my-bp', BP_API_TOKEN: 'tkn' }))
+            .toEqual({ apiUrl: 'https://icinga.example/bp-api', bp: 'my-bp', token: 'tkn' })
     })
 
     test('the business process name is mandatory with BP_API_URL', () => {
-        expect(() => businessProcess.readConfig({ BP_API_URL: 'http://10.0.0.4:8080' })).toThrow('missing business process configuration: ICINGA_BP')
+        expect(() => businessProcess.readConfig({ BP_API_URL: 'https://icinga.example/bp-api', BP_API_TOKEN: 'tkn' })).toThrow('missing business process configuration: ICINGA_BP')
+    })
+
+    test('the token is mandatory with BP_API_URL', () => {
+        expect(() => businessProcess.readConfig({ BP_API_URL: 'https://icinga.example/bp-api', ICINGA_BP: 'my-bp' })).toThrow('missing business process configuration: BP_API_TOKEN')
     })
 })
 
 
 describe('createClient tests', () => {
     test('creates a dedicated instance', () => {
-        const client = businessProcess.createClient({ apiUrl: 'http://10.0.0.4:8080', bp: 'bp' })
+        const client = businessProcess.createClient({ apiUrl: 'http://10.0.0.4:8080', bp: 'bp', token: 'tkn' })
         expect(client).not.toBe(axios)
+        expect(client.defaults.headers.Authorization).toBe('Bearer tkn')
         expect(client.defaults.baseURL).toBe('http://10.0.0.4:8080')
         expect(client.interceptors.request.handlers.length).toBe(0)
         expect(client.interceptors.response.handlers.length).toBe(0)

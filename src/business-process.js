@@ -29,7 +29,7 @@ module.exports = {
  * reads the bp-api configuration from the environment
  * @param {object} env environment variables (defaults to process.env)
  * @returns {object|null} configuration, null when BP_API_URL is not set (business process update disabled)
- * @throws {Error} when BP_API_URL is set but ICINGA_BP is not
+ * @throws {Error} when BP_API_URL is set but ICINGA_BP or BP_API_TOKEN is not
  */
 function readConfig(env = process.env) {
     if (!env.BP_API_URL) {
@@ -38,9 +38,13 @@ function readConfig(env = process.env) {
     if (!env.ICINGA_BP) {
         throw new Error('missing business process configuration: ICINGA_BP')
     }
+    if (!env.BP_API_TOKEN) {
+        throw new Error('missing business process configuration: BP_API_TOKEN')
+    }
     return {
         apiUrl: env.BP_API_URL.replace(/\/+$/, ''),
-        bp: env.ICINGA_BP
+        bp: env.ICINGA_BP,
+        token: env.BP_API_TOKEN
     }
 }
 
@@ -54,7 +58,8 @@ function createClient(config) {
     return axios.create({
         baseURL: config.apiUrl,
         timeout: REQUEST_TIMEOUT_MS,
-        headers: { Accept: 'application/json' },
+        // Bearer token checked by the bp-api
+        headers: { Accept: 'application/json', Authorization: `Bearer ${config.token}` },
         httpAgent: new http.Agent({ keepAlive: false })
     })
 }

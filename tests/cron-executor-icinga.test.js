@@ -68,7 +68,7 @@ describe('cron-executor icinga integration', () => {
 
     test('the hook creates host and services, then updates the business process', async () => {
         const { cronExecutor, tester, icinga, businessProcess, logger } = loadCronExecutor({
-            ...ICINGA_ENV, BP_API_URL: 'http://10.0.0.4:8080', ICINGA_BP: 'my-bp'
+            ...ICINGA_ENV, BP_API_URL: 'http://10.0.0.4:8080', ICINGA_BP: 'my-bp', BP_API_TOKEN: 'tkn'
         });
         const order = [];
         jest.spyOn(icinga, 'ensureHostAndServices').mockImplementation(async () => { order.push('icinga'); });
@@ -83,6 +83,7 @@ describe('cron-executor icinga integration', () => {
         expect(icinga.ensureHostAndServices).toHaveBeenCalledWith(configurations, expect.anything(), 'my-host');
         const [, client, bp, host] = businessProcess.updateBusinessProcess.mock.calls[0];
         expect(client.defaults.baseURL).toBe('http://10.0.0.4:8080');
+        expect(client.defaults.headers.Authorization).toBe('Bearer tkn');
         expect(bp).toBe('my-bp');
         expect(host).toBe('my-host');
         expect(logger.debug).toHaveBeenCalledWith('Icinga business process update enabled: http://10.0.0.4:8080, business process my-bp');
@@ -102,7 +103,7 @@ describe('cron-executor icinga integration', () => {
     });
 
     test('the business process is not updated without ICINGA_BP, icinga keeps working', async () => {
-        const { cronExecutor, tester, icinga, businessProcess, logger } = loadCronExecutor({ ...ICINGA_ENV, BP_API_URL: 'http://10.0.0.4:8080' });
+        const { cronExecutor, tester, icinga, businessProcess, logger } = loadCronExecutor({ ...ICINGA_ENV, BP_API_URL: 'http://10.0.0.4:8080', BP_API_TOKEN: 'tkn' });
         jest.spyOn(icinga, 'ensureHostAndServices').mockResolvedValue(undefined);
         jest.spyOn(businessProcess, 'updateBusinessProcess').mockResolvedValue(undefined);
 
@@ -136,6 +137,20 @@ describe('cron-executor icinga integration', () => {
         await cronExecutor.execute();
 
         expect(logger.info).not.toHaveBeenCalledWith(expect.stringContaining('icinga check results'));
+    });
+
+    test('the business process is not updated without BP_API_TOKEN, icinga keeps working', async () => {
+        const { cronExecutor, tester, icinga, businessProcess, logger } = loadCronExecutor({ ...ICINGA_ENV, BP_API_URL: 'http://10.0.0.4:8080', ICINGA_BP: 'my-bp' });
+        jest.spyOn(icinga, 'ensureHostAndServices').mockResolvedValue(undefined);
+        jest.spyOn(businessProcess, 'updateBusinessProcess').mockResolvedValue(undefined);
+
+        await cronExecutor.execute();
+        await tester.runMonitoring.mock.calls[0][4]([]);
+
+        expect(tester.runMonitoring.mock.calls[0][1]).toBe('icingaSender');
+        expect(icinga.ensureHostAndServices).toHaveBeenCalled();
+        expect(businessProcess.updateBusinessProcess).not.toHaveBeenCalled();
+        expect(logger.error).toHaveBeenCalledWith('Icinga business process update disabled: missing business process configuration: BP_API_TOKEN');
     });
 
     test('falls back to Application Insights only when the icinga configuration is incomplete', async () => {

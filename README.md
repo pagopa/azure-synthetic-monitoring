@@ -164,6 +164,7 @@ When checking the certificate, the suffix `-cert` will be appended to the "runLo
 | `ICINGA_TLS_SERVERNAME`           | name verified on the icinga api certificate instead of the url host (the VM short hostname)           | no                  | -         |
 | `BP_API_URL`                      | bp-api base url on the icinga VM, e.g. `https://<icinga fqdn>/bp-api` (reverse proxy). when unset the business process is not updated | no        | -         |
 | `ICINGA_BP`                       | name of the icinga business process (file `<name>.conf`) holding the synthetic nodes. when missing with `BP_API_URL` set, the business process update is disabled and an error is logged at startup | with `BP_API_URL` | - |
+| `BP_API_TOKEN`                    | Bearer token of the bp-api (secret). when missing with `BP_API_URL` set, the business process update is disabled and an error is logged at startup | with `BP_API_URL` | - |
 
 ## Icinga integration
 
@@ -207,6 +208,7 @@ Icinga VM once:
 
 ```
 POST <BP_API_URL>/business-process/<ICINGA_BP>/block/synthetic
+Authorization: Bearer <BP_API_TOKEN>
 { "host": "<ICINGA_HOST>", "blocks": [ { "domain": "<tags.domain>", "name": "<appName>-<apiName>-<type>" } ] }
 ```
 
@@ -216,7 +218,7 @@ The bp-api rewrites the `synthetic` section of the business process, defining fo
 - only the tests with the `domain` tag are included; the domain is sanitized like Terraform does (characters outside
   `[A-Za-z0-9_.-]` become `_`), so it must match the `domain` tag of the Azure resources
 - without any test with the `domain` tag the bp-api is not called (it rejects an empty list)
-- errors are only logged: the tests run anyway
+- errors are only logged: the tests run anyway (a wrong token is logged as `401`)
 
 ## Deploy
 
