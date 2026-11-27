@@ -156,13 +156,13 @@ When checking the certificate, the suffix `-cert` will be appended to the "runLo
 | `CERT_VALIDITY_RANGE_DAYS`        | number of days before the expiration date of a certificate over which the check is considered success | yes                 | -         |
 | `LOG_LEVEL`                       | logging verbosity. accepted values: `DEBUG`, `INFO`, `ERROR`                                          | no                  | `INFO`    |
 | `ICINGA_INTEGRATION_ENABLED`      | enables the icinga integration (cron mode only). `true` to enable                                     | no                  | `false`   |
-| `ICINGA_API_URL`                  | icinga api base url, e.g. `https://<icinga-ip>:5665`                                                  | icinga enabled only | -         |
+| `ICINGA_API_URL`                  | icinga api base url, e.g. `https://<icinga fqdn>` (reverse proxy) or `https://<icinga-ip>:5665`       | icinga enabled only | -         |
 | `ICINGA_USER`                     | icinga api user                                                                                       | no                  | synthetic |
 | `ICINGA_PASSWORD`                 | icinga api user password                                                                              | icinga enabled only | -         |
 | `ICINGA_HOST`                     | icinga host holding the synthetic services                                                            | no                  | synthetic |
 | `ICINGA_CA_CERT`                  | PEM of the icinga CA (`\n` literals accepted). when unset the system CAs are used                     | no                  | -         |
 | `ICINGA_TLS_SERVERNAME`           | name verified on the icinga api certificate instead of the url host (the VM short hostname)           | no                  | -         |
-| `BP_API_URL`                      | bp-api base url on the icinga VM, e.g. `http://<icinga-ip>:8080`. when unset the business process is not updated | no        | -         |
+| `BP_API_URL`                      | bp-api base url on the icinga VM, e.g. `https://<icinga fqdn>/bp-api` (reverse proxy). when unset the business process is not updated | no        | -         |
 | `ICINGA_BP`                       | name of the icinga business process (file `<name>.conf`) holding the synthetic nodes. when missing with `BP_API_URL` set, the business process update is disabled and an error is logged at startup | with `BP_API_URL` | - |
 
 ## Icinga integration
@@ -189,8 +189,10 @@ The duration is sent as performance data, with `durationLimit` as critical thres
   `vars.url` and, when the configuration has the `domain` tag, `vars.domain`
 - existing objects are never modified or deleted: to apply new attributes delete the service, it is recreated by the next run.
   Services of removed configurations are not deleted
-- the Icinga api is called with a dedicated http client: TLS verification is always on. The api certificate is issued by the
-  Icinga CA for the VM short hostname: set `ICINGA_CA_CERT` (`/var/lib/icinga2/certs/ca.crt`) and `ICINGA_TLS_SERVERNAME`
+- the Icinga api is called with a dedicated http client: TLS verification is always on. Through the reverse proxy of the
+  Icinga VM (`https://<icinga fqdn>`, publicly trusted certificate) no other setting is needed. Calling port 5665 directly,
+  the certificate is issued by the Icinga CA for the VM short hostname: set `ICINGA_CA_CERT` (`/var/lib/icinga2/certs/ca.crt`)
+  and `ICINGA_TLS_SERVERNAME`
 - at `INFO` level each run logs a summary: services existing/created/failed, business process sent and updated,
   check results about to be sent and, at the end, sent by state and failed
 - with `LOG_LEVEL=DEBUG` every send is also logged with the state and output sent and the Icinga response code, as well as
