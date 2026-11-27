@@ -2,12 +2,15 @@ const constants = require('./const')
 const statics = require('./statics')
 const logger = require('./logger')
 
+const icinga = require('./icinga')
+
 
 module.exports = {
     trackSelfAvailabilityEvent,
     eventSender,
     telemetrySender,
     eventAndTelemetrySender,
+    appInsightAndIcingaSender,
     checkApi,
     logSender,
     logSuccess,
@@ -117,6 +120,22 @@ function eventAndTelemetrySender(client){
     }
 }
 
+
+/**
+ * Creates a sender that sequentially sends an event and availability telemetry
+ * to Application Insights, then publishes the check result on Icinga.
+ * Icinga errors are logged and never affect the Application Insights flow.
+ * @param {TelemetryClient} telemetryClient Application Insights telemetry client
+ * @param {Axios} icingaClient Icinga client, as returned by icinga.createClient
+ * @param {string} icingaHost Icinga host holding the synthetic services
+ * @returns {function} An async function that accepts and returns the metric context
+ */
+function appInsightAndIcingaSender(telemetryClient, icingaClient, icingaHost, icingaStats) {
+  return async function (metricContext) {
+    const contextAfterTelemetry = await eventAndTelemetrySender(telemetryClient)(metricContext);
+    return await icinga.sendCheckResult(contextAfterTelemetry, icingaClient, icingaHost, icingaStats);
+  }
+}
 
 
 /**

@@ -148,13 +148,84 @@ When checking the certificate, the suffix `-cert` will be appended to the "runLo
 | `STORAGE_ACCOUNT_CONNECTION_STRING` | storage account connection string. used by the queue client in queue mode                           | queue mode only     | -         |
 | `INBOUND_QUEUE_NAME`              | name of the Azure Storage Queue from which monitoring requests are read                               | queue mode only     | -         |
 | `OUTBOUND_QUEUE_NAME`             | name of the Azure Storage Queue to which monitoring results are written                               | queue mode only     | -         |
-| `QUEUE_BATCH_SIZE`                | number of messages to retrieve from the inbound queue in each execution                                | queue mode only     | `1`       |
+| `QUEUE_BATCH_SIZE`                | number of messages to retrieve from the inbound queue in each execution                               | queue mode only     | `1`       |
 | `OPERATION_MODE`                  | execution mode. accepted values: `cron`, `queue`                                                      | no                  | `cron`    |
 | `AVAILABILITY_PREFIX`             | prefix used in the custom metric and events names                                                     | no                  | synthetic |
 | `HTTP_CLIENT_TIMEOUT`             | response timeout used by the http client performing the availability requests                         | yes                 | -         |
 | `LOCATION`                        | region name where this job is run                                                                     | yes                 | -         |
 | `CERT_VALIDITY_RANGE_DAYS`        | number of days before the expiration date of a certificate over which the check is considered success | yes                 | -         |
 | `LOG_LEVEL`                       | logging verbosity. accepted values: `DEBUG`, `INFO`, `ERROR`                                          | no                  | `INFO`    |
+| `ICINGA_INTEGRATION_ENABLED`      | enables the icinga integration (cron mode only). `true` to enable                                     | no                  | `false`   |
+| `ICINGA_API_URL`                  | icinga api base url, e.g. `https://<icinga fqdn>` (reverse proxy) or `https://<icinga-ip>:5665`       | icinga enabled only | -         |
+| `ICINGA_USER`                     | icinga api user                                                                                       | no                  | synthetic |
+| `ICINGA_PASSWORD`                 | icinga api user password                                                                              | icinga enabled only | -         |
+| `ICINGA_HOST`                     | icinga host holding the synthetic services                                                            | no                  | synthetic |
+| `ICINGA_CA_CERT`                  | PEM of the icinga CA (`\n` literals accepted). when unset the system CAs are used                     | no                  | -         |
+| `ICINGA_TLS_SERVERNAME`           | name verified on the icinga api certificate instead of the url host (the VM short hostname)           | no                  | -         |
+| `BP_API_URL`                      | bp-api base url on the icinga VM, e.g. `https://<icinga fqdn>/bp-api` (reverse proxy). when unset the business process is not updated | no        | -         |
+| `ICINGA_BP`                       | name of the icinga business process (file `<name>.conf`) holding the synthetic nodes. when missing with `BP_API_URL` set, the business process update is disabled and an error is logged at startup | with `BP_API_URL` | - |
+| `BP_API_TOKEN`                    | Bearer token of the bp-api (secret). when missing with `BP_API_URL` set, the business process update is disabled and an error is logged at startup | with `BP_API_URL` | - |
+
+## Icinga integration
+
+When `ICINGA_INTEGRATION_ENABLED=true` (cron mode), before the tests start the Icinga host `ICINGA_HOST` and a service
+`<appName>-<apiName>-<type>` for each configuration are created, if missing. Then, after sending events and availability
+to Application Insights, each test publishes its result on Icinga with the `process-check-result` action on its service:
+
+| outcome                                       | exit status | plugin output                                                          |
+|-----------------------------------------------|-------------|------------------------------------------------------------------------|
+| api check ok (and certificate ok/not checked) | 0 OK        | `OK - <url>`, then `certificate OK`                                    |
+| api check ok, certificate check failed        | 1 WARNING   | `KO certificate - <url> - <cert error>`                                |
+| api check failed                              | 2 CRITICAL  | `KO - <url> - <api error>`, then `certificate OK` or `certificate KO[ - <cert error>]` |
+
+The certificate outcome is on a second line (Icinga long output, shown in the service detail, not in the lists) and only
+when `checkCertificate` is enabled; on api failure the certificate error is omitted when equal to the api one
+(e.g. both timed out).
+
+The duration is sent as performance data, with `durationLimit` as critical threshold.
+
+- the host is a `dummy` always UP; each service is a `dummy` CRITICAL with `check_interval` 8 minutes and
+  `max_check_attempts` 1: every result sent postpones the active check, so a service with no result from synthetic
+  for 8 minutes goes CRITICAL (`no result from synthetic in the last 8 minutes`). Services carry `vars.managed_by = synthetic`,
+  `vars.url` and, when the configuration has the `domain` tag, `vars.domain`
+- the services of the host with `vars.managed_by = synthetic` are aligned to the configurations on every run (cron mode
+  only: it is the one testing all the configurations), each change logged at `INFO`:
+  - `check_command`, `check_interval`, `retry_interval`, `max_check_attempts` and `vars` different from the expected
+    ones are updated, keeping the history of the service. `vars` is owned by synthetic and replaced as a whole: a
+    variable set by hand is removed
+  - services without a configuration (removed or renamed, or not readable in that run) are deleted, with their
+    comments and downtimes (`cascade`)
+- services created by others are never updated nor deleted. The Icinga api user needs `objects/modify/Service` and
+  `objects/delete/Service` filtered on `service.vars.managed_by == "synthetic"`. The host is only created, never updated
+- the Icinga api is called with a dedicated http client: TLS verification is always on. Through the reverse proxy of the
+  Icinga VM (`https://<icinga fqdn>`, publicly trusted certificate) no other setting is needed. Calling port 5665 directly,
+  the certificate is issued by the Icinga CA for the VM short hostname: set `ICINGA_CA_CERT` (`/var/lib/icinga2/certs/ca.crt`)
+  and `ICINGA_TLS_SERVERNAME`
+- at `INFO` level each run logs a summary: services existing/created/updated/deleted/failed, business process sent and updated,
+  check results about to be sent and, at the end, sent by state and failed
+- with `LOG_LEVEL=DEBUG` every send is also logged with the state and output sent and the Icinga response code, as well as
+  the startup configuration and each created object. Errors are always logged
+- Icinga errors are only logged: they never affect the Application Insights flow
+- if the Icinga configuration is incomplete the integration is disabled and an error is logged at startup
+
+### Business process
+
+When `BP_API_URL` is also set, every run (after creating host and services, before the tests) calls the bp-api on the
+Icinga VM once:
+
+```
+POST <BP_API_URL>/business-process/<ICINGA_BP>/block/synthetic
+Authorization: Bearer <BP_API_TOKEN>
+{ "host": "<ICINGA_HOST>", "blocks": [ { "domain": "<tags.domain>", "name": "<appName>-<apiName>-<type>" } ] }
+```
+
+The bp-api rewrites the `synthetic` section of the business process, defining for each domain the node
+`synthetic_<domain>` as the AND of its synthetic services; the domain nodes written by Terraform reference it.
+
+- only the tests with the `domain` tag are included; the domain is sanitized like Terraform does (characters outside
+  `[A-Za-z0-9_.-]` become `_`), so it must match the `domain` tag of the Azure resources
+- without any test with the `domain` tag the bp-api is not called (it rejects an empty list)
+- errors are only logged: the tests run anyway (a wrong token is logged as `401`)
 
 ## Deploy
 

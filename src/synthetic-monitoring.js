@@ -60,9 +60,20 @@ axios.interceptors.request.use(
   );
 
 
-async function runMonitoring(monitoringConfigurationFilter, sender, onSuccess, onFailure) {
+/**
+ * runs the monitoring tests configured on the table storage
+ * @param {function} monitoringConfigurationFilter returns true for the configurations to test
+ * @param {function} sender sends the result of a test
+ * @param {function} onSuccess called when all the tests have been executed
+ * @param {function} onFailure called when at least one test failed to execute
+ * @param {function} [beforeTests] optional async hook called with the selected configurations
+ *                   before the tests start. its errors are logged and never stop the tests
+ */
+async function runMonitoring(monitoringConfigurationFilter, sender, onSuccess, onFailure, beforeTests) {
     let tableEntities = tableClient.listEntities();
     let tests = []
+    let selected = []
+    let parseErrors = []
     const startTime = Date.now();
     for await (const tableConfiguration of tableEntities) {
         try {
@@ -88,9 +99,7 @@ async function runMonitoring(monitoringConfigurationFilter, sender, onSuccess, o
 
             if(monitoringConfigurationFilter(monitoringConfiguration)){
               logger.info(statics.testId(monitoringConfiguration), `passed the filter, adding test promise`)
-              tests.push(testIt(monitoringConfiguration, axios, sender).catch((error) => {
-                logger.error(statics.testId(monitoringConfiguration), `error in test: ${JSON.stringify(error.message)}`)
-              }));
+              selected.push(monitoringConfiguration)
             }
 
 
@@ -98,10 +107,28 @@ async function runMonitoring(monitoringConfigurationFilter, sender, onSuccess, o
 
         } catch (parseError){
             logger.error(`error parsing test for ${JSON.stringify(tableConfiguration)}. ${parseError.message}`)
-            tests.push(new Promise((resolve, reject) => {
-                reject(parseError.message)
-              }));
+            parseErrors.push(parseError.message)
         }
+    }
+
+    if (beforeTests && selected.length > 0) {
+        try {
+            await beforeTests(selected)
+        } catch (error) {
+            logger.error(`error in before tests hook: ${error.message}`)
+        }
+    }
+
+    // rejected promises are created only now, right before Promise.all handles them:
+    // created earlier they would stay unhandled while the hook is awaited
+    for (const message of parseErrors) {
+        tests.push(Promise.reject(message))
+    }
+
+    for (const monitoringConfiguration of selected) {
+        tests.push(testIt(monitoringConfiguration, axios, sender).catch((error) => {
+            logger.error(statics.testId(monitoringConfiguration), `error in test: ${JSON.stringify(error.message)}`)
+        }));
     }
 
     await Promise.all(tests)
