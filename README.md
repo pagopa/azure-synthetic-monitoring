@@ -188,13 +188,20 @@ The duration is sent as performance data, with `durationLimit` as critical thres
   `max_check_attempts` 1: every result sent postpones the active check, so a service with no result from synthetic
   for 8 minutes goes CRITICAL (`no result from synthetic in the last 8 minutes`). Services carry `vars.managed_by = synthetic`,
   `vars.url` and, when the configuration has the `domain` tag, `vars.domain`
-- existing objects are never modified or deleted: to apply new attributes delete the service, it is recreated by the next run.
-  Services of removed configurations are not deleted
+- the services of the host with `vars.managed_by = synthetic` are aligned to the configurations on every run (cron mode
+  only: it is the one testing all the configurations), each change logged at `INFO`:
+  - `check_command`, `check_interval`, `retry_interval`, `max_check_attempts` and `vars` different from the expected
+    ones are updated, keeping the history of the service. `vars` is owned by synthetic and replaced as a whole: a
+    variable set by hand is removed
+  - services without a configuration (removed or renamed, or not readable in that run) are deleted, with their
+    comments and downtimes (`cascade`)
+- services created by others are never updated nor deleted. The Icinga api user needs `objects/modify/Service` and
+  `objects/delete/Service` filtered on `service.vars.managed_by == "synthetic"`. The host is only created, never updated
 - the Icinga api is called with a dedicated http client: TLS verification is always on. Through the reverse proxy of the
   Icinga VM (`https://<icinga fqdn>`, publicly trusted certificate) no other setting is needed. Calling port 5665 directly,
   the certificate is issued by the Icinga CA for the VM short hostname: set `ICINGA_CA_CERT` (`/var/lib/icinga2/certs/ca.crt`)
   and `ICINGA_TLS_SERVERNAME`
-- at `INFO` level each run logs a summary: services existing/created/failed, business process sent and updated,
+- at `INFO` level each run logs a summary: services existing/created/updated/deleted/failed, business process sent and updated,
   check results about to be sent and, at the end, sent by state and failed
 - with `LOG_LEVEL=DEBUG` every send is also logged with the state and output sent and the Icinga response code, as well as
   the startup configuration and each created object. Errors are always logged

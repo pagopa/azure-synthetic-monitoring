@@ -366,19 +366,119 @@ async function ensureHost(client, host) {
 }
 
 
+// attributes of the services owned by synthetic (serviceAttributes): compared on every run, updated when different
+const MANAGED_ATTRIBUTES = ['check_command', 'check_interval', 'retry_interval', 'max_check_attempts', 'vars']
+
+
+/**
+ * services of the host on icinga
+ * @returns {Promise<Map<string, object>>} short name => attributes (MANAGED_ATTRIBUTES)
+ */
 async function existingServices(client, host) {
-    const response = await client.get('/objects/services', {
-        params: { filter: `host.name=="${host}"`, attrs: 'name' }
+    // attrs repeated in the query string: icinga does not accept the attrs[] of axios
+    const attrs = ['name', ...MANAGED_ATTRIBUTES].map((name) => `attrs=${name}`).join('&')
+    const response = await client.get(`/objects/services?${attrs}`, {
+        params: { filter: `host.name=="${host}"` }
     })
     const results = (response.data && response.data.results) || []
-    return new Set(results.map((result) => result.attrs.name))
+    return new Map(results.map((result) => [result.attrs.name, result.attrs]))
+}
+
+
+function isManaged(attrs) {
+    return Boolean(attrs.vars) && attrs.vars.managed_by === MANAGED_BY
+}
+
+
+function sameValue(current, desired) {
+    if (typeof desired === 'number') {
+        // icinga returns the intervals as floating point numbers
+        return Number(current) === desired
+    }
+    if (desired && typeof desired === 'object') {
+        const keys = Object.keys(desired)
+        return Boolean(current) && typeof current === 'object' &&
+            Object.keys(current).length === keys.length &&
+            keys.every((key) => Object.prototype.hasOwnProperty.call(current, key) && sameValue(current[key], desired[key]))
+    }
+    return current === desired
 }
 
 
 /**
- * creates on icinga the host and the services missing for the given configurations.
- * existing objects are not modified. never rejects: errors are logged and the tests run anyway
- * (the results of the services that could not be created are rejected by icinga with 404)
+ * attributes of a service to update: the managed ones differing from the desired ones.
+ * vars is replaced as a whole (it is owned by synthetic)
+ * @param {object} current attributes on icinga
+ * @param {object} desired as returned by serviceAttributes
+ * @returns {object} attributes to send, empty when the service is up to date
+ */
+function changedAttributes(current, desired) {
+    const changed = {}
+    for (const name of MANAGED_ATTRIBUTES) {
+        if (!sameValue(current[name], desired[name])) {
+            changed[name] = desired[name]
+        }
+    }
+    return changed
+}
+
+
+/**
+ * updates the given attributes of a service
+ * @returns {Promise<boolean>} true when updated
+ */
+async function updateService(client, host, name, attrs) {
+    try {
+        await client.post(`/objects/services/${encodeURIComponent(host)}!${encodeURIComponent(name)}`, { attrs })
+        logger.info(`icinga service ${host}!${name} updated: ${Object.keys(attrs).join(', ')}`)
+        return true
+    } catch (error) {
+        logger.error(`error updating icinga service ${host}!${name}: ${errorDetail(error)}`)
+        return false
+    }
+}
+
+
+/**
+ * deletes a service, with its comments and downtimes. a service already gone is ok
+ * @returns {Promise<boolean>} true when the service does not exist at the end of the call
+ */
+async function deleteService(client, host, name) {
+    try {
+        await client.delete(`/objects/services/${encodeURIComponent(host)}!${encodeURIComponent(name)}`, { params: { cascade: 1 } })
+        logger.info(`icinga service ${host}!${name} deleted: no monitoring configuration`)
+        return true
+    } catch (error) {
+        if (error.response && error.response.status === 404) {
+            return true
+        }
+        logger.error(`error deleting icinga service ${host}!${name}: ${errorDetail(error)}`)
+        return false
+    }
+}
+
+
+/**
+ * runs the given operations a few at a time
+ * @returns {Promise<number>} number of operations returning false
+ */
+async function inBatches(items, operation) {
+    let failed = 0
+    for (let i = 0; i < items.length; i += MAX_SOCKETS) {
+        const outcomes = await Promise.all(items.slice(i, i + MAX_SOCKETS).map(operation))
+        failed += outcomes.filter((ok) => !ok).length
+    }
+    return failed
+}
+
+
+/**
+ * aligns icinga to the given configurations: creates the host and the missing services, updates the attributes
+ * of the services managed by synthetic that differ from the configuration, deletes the services managed by
+ * synthetic without a configuration. services created by others are never touched. never rejects: errors are
+ * logged and the tests run anyway (the results of the services that could not be created are rejected by icinga with 404).
+ * the configurations must be ALL the configurations (cron run): with a subset (e.g. the queue executor, filtered by
+ * app name) the services of the other configurations would be deleted
  * @param {object[]} monitoringConfigurations configurations about to be tested
  * @param {Axios} client icinga client, as returned by createClient
  * @param {string} host icinga host holding the synthetic services
@@ -391,25 +491,37 @@ async function ensureHostAndServices(monitoringConfigurations, client, host) {
         }
         const existing = await existingServices(client, host)
 
-        const missing = new Map()
+        const configured = new Map()
         for (const configuration of monitoringConfigurations) {
             const name = serviceName(configuration)
-            if (!existing.has(name) && !missing.has(name)) {
-                missing.set(name, configuration)
+            if (!configured.has(name)) {
+                configured.set(name, configuration)
             }
         }
-
-        let failed = 0
-        const queue = [...missing.entries()]
-        // a few requests at a time: the first run creates all the services
-        for (let i = 0; i < queue.length; i += MAX_SOCKETS) {
-            const outcomes = await Promise.all(queue.slice(i, i + MAX_SOCKETS).map(([name, configuration]) =>
-                createObject(client, `/objects/services/${encodeURIComponent(host)}!${encodeURIComponent(name)}`,
-                    serviceAttributes(configuration), `service ${host}!${name}`)))
-            failed += outcomes.filter((created) => !created).length
+        const missing = [...configured.entries()].filter(([name]) => !existing.has(name))
+        const updates = []
+        for (const [name, configuration] of configured) {
+            const current = existing.get(name)
+            if (current && isManaged(current)) {
+                const attrs = changedAttributes(current, serviceAttributes(configuration))
+                if (Object.keys(attrs).length > 0) {
+                    updates.push([name, attrs])
+                }
+            }
         }
+        // services not created by synthetic are never updated nor deleted (the api user can not either)
+        const orphans = [...existing.entries()].filter(([name, attrs]) => isManaged(attrs) && !configured.has(name)).map(([name]) => name)
 
-        logger.info(`icinga host ${host}: ${existing.size} services existing, ${missing.size - failed} created, ${failed} failed`)
+        // a few requests at a time: the first run creates all the services
+        const createFailed = await inBatches(missing, ([name, configuration]) =>
+            createObject(client, `/objects/services/${encodeURIComponent(host)}!${encodeURIComponent(name)}`,
+                serviceAttributes(configuration), `service ${host}!${name}`))
+        const updateFailed = await inBatches(updates, ([name, attrs]) => updateService(client, host, name, attrs))
+        const deleteFailed = await inBatches(orphans, (name) => deleteService(client, host, name))
+
+        logger.info(`icinga host ${host}: ${existing.size} services existing, ${missing.length - createFailed} created, ` +
+            `${updates.length - updateFailed} updated, ${orphans.length - deleteFailed} deleted, ` +
+            `${createFailed + updateFailed + deleteFailed} failed`)
     } catch (error) {
         logger.error(`error preparing icinga host ${host} and services: ${errorDetail(error)}`)
     }

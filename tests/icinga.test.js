@@ -318,15 +318,28 @@ describe('ensureHostAndServices tests', () => {
         response: { status: 500, data: { results: [{ code: 500, errors: ["Object 'x' already exists."], status: 'Object could not be created.' }] } }
     })
 
-    function client({ hostExists = true, services = [], put } = {}) {
+    // attributes on icinga of a service created by synthetic and up to date: <appName>-<apiName>-<type>
+    const upToDate = (name) => {
+        const [appName, apiName, type] = name.split('-')
+        return icinga.serviceAttributes(configuration(appName, apiName, type))
+    }
+
+    // services: created by synthetic (name => up to date, [name, attrs] => given attrs), unmanaged: created by someone else
+    function client({ hostExists = true, services = [], unmanaged = [], put, post, del } = {}) {
+        const result = (name, attrs) => ({ name: `synthetic!${name}`, attrs: { name, ...attrs } })
         return {
             get: jest.fn().mockImplementation((path) => {
                 if (path.startsWith('/objects/hosts/')) {
                     return hostExists ? Promise.resolve({ data: { results: [{ name: 'synthetic' }] } }) : Promise.reject(notFound())
                 }
-                return Promise.resolve({ data: { results: services.map((name) => ({ name: `synthetic!${name}`, attrs: { name } })) } })
+                return Promise.resolve({ data: { results: [
+                    ...services.map((service) => Array.isArray(service) ? result(...service) : result(service, upToDate(service))),
+                    ...unmanaged.map((name) => result(name, { check_command: 'dummy', vars: null }))
+                ] } })
             }),
-            put: put || jest.fn().mockResolvedValue({ data: { results: [{ code: 200 }] } })
+            put: put || jest.fn().mockResolvedValue({ data: { results: [{ code: 200 }] } }),
+            post: post || jest.fn().mockResolvedValue({ data: { results: [{ code: 200 }] } }),
+            delete: del || jest.fn().mockResolvedValue({ data: { results: [{ code: 200 }] } })
         }
     }
 
@@ -335,10 +348,58 @@ describe('ensureHostAndServices tests', () => {
 
         await icinga.ensureHostAndServices([configuration('app', 'one'), configuration('app', 'two'), configuration('app', 'two')], c, 'synthetic')
 
-        expect(c.get).toHaveBeenCalledWith('/objects/services', { params: { filter: 'host.name=="synthetic"', attrs: 'name' } })
+        expect(c.get).toHaveBeenCalledWith('/objects/services?attrs=name&attrs=check_command&attrs=check_interval&attrs=retry_interval&attrs=max_check_attempts&attrs=vars', { params: { filter: 'host.name=="synthetic"' } })
         expect(c.put).toHaveBeenCalledTimes(1)
         expect(c.put).toHaveBeenCalledWith('/objects/services/synthetic!app-two-aks', { attrs: expect.objectContaining({ check_interval: 480 }) })
-        expect(logger.info).toHaveBeenCalledWith('icinga host synthetic: 1 services existing, 1 created, 0 failed')
+        expect(c.delete).not.toHaveBeenCalled()
+        expect(c.post).not.toHaveBeenCalled()
+        expect(logger.info).toHaveBeenCalledWith('icinga host synthetic: 1 services existing, 1 created, 0 updated, 0 deleted, 0 failed')
+    })
+
+    test('updates only the changed attributes of the services managed by synthetic, vars as a whole', async () => {
+        const changedUrl = { ...upToDate('app-one-aks'), vars: { ...upToDate('app-one-aks').vars, url: 'https://old.com/path' } }
+        const oldInterval = { ...upToDate('app-two-aks'), check_interval: 300.0, retry_interval: 480.0 }
+        const c = client({ services: [['app-one-aks', changedUrl], ['app-two-aks', oldInterval], 'app-three-aks'] })
+
+        await icinga.ensureHostAndServices([configuration('app', 'one'), configuration('app', 'two'), configuration('app', 'three')], c, 'synthetic')
+
+        expect(c.post.mock.calls).toEqual([
+            ['/objects/services/synthetic!app-one-aks', { attrs: { vars: upToDate('app-one-aks').vars } }],
+            ['/objects/services/synthetic!app-two-aks', { attrs: { check_interval: 480 } }]
+        ])
+        expect(logger.info).toHaveBeenCalledWith('icinga service synthetic!app-one-aks updated: vars')
+        expect(logger.info).toHaveBeenCalledWith('icinga service synthetic!app-two-aks updated: check_interval')
+        expect(logger.info).toHaveBeenCalledWith('icinga host synthetic: 3 services existing, 0 created, 2 updated, 0 deleted, 0 failed')
+    })
+
+    test('a domain tag removed from the configuration is removed from the vars', async () => {
+        const withDomain = { ...upToDate('app-one-aks'), vars: { ...upToDate('app-one-aks').vars, domain: 'core' } }
+        const c = client({ services: [['app-one-aks', withDomain]] })
+
+        await icinga.ensureHostAndServices([configuration('app', 'one')], c, 'synthetic')
+
+        expect(c.post).toHaveBeenCalledWith('/objects/services/synthetic!app-one-aks', { attrs: { vars: upToDate('app-one-aks').vars } })
+        expect(upToDate('app-one-aks').vars).not.toHaveProperty('domain')
+    })
+
+    test('never updates services not created by synthetic', async () => {
+        const c = client({ unmanaged: ['app-one-aks'] })
+
+        await icinga.ensureHostAndServices([configuration('app', 'one')], c, 'synthetic')
+
+        expect(c.post).not.toHaveBeenCalled()
+        expect(c.put).not.toHaveBeenCalled()
+    })
+
+    test('a failed update is logged and counted', async () => {
+        const stale = { ...upToDate('app-one-aks'), max_check_attempts: 3 }
+        const post = jest.fn().mockRejectedValue(Object.assign(new Error('403'), { response: { status: 403, data: { status: 'No permission' } } }))
+        const c = client({ services: [['app-one-aks', stale]], post })
+
+        await expect(icinga.ensureHostAndServices([configuration('app', 'one')], c, 'synthetic')).resolves.toBeUndefined()
+
+        expect(logger.error).toHaveBeenCalledWith('error updating icinga service synthetic!app-one-aks: 403 {"status":"No permission"}')
+        expect(logger.info).toHaveBeenCalledWith('icinga host synthetic: 1 services existing, 0 created, 0 updated, 0 deleted, 1 failed')
     })
 
     test('creates the host when missing, before the services', async () => {
@@ -356,7 +417,7 @@ describe('ensureHostAndServices tests', () => {
         await icinga.ensureHostAndServices([configuration('app', 'one')], c, 'synthetic')
 
         expect(logger.error).not.toHaveBeenCalled()
-        expect(logger.info).toHaveBeenCalledWith('icinga host synthetic: 0 services existing, 1 created, 0 failed')
+        expect(logger.info).toHaveBeenCalledWith('icinga host synthetic: 0 services existing, 1 created, 0 updated, 0 deleted, 0 failed')
     })
 
     test('services are not created when the host cannot be created', async () => {
@@ -377,7 +438,43 @@ describe('ensureHostAndServices tests', () => {
         await expect(icinga.ensureHostAndServices([configuration('app', 'one'), configuration('app', 'two')], c, 'synthetic')).resolves.toBeUndefined()
 
         expect(logger.error).toHaveBeenCalledWith('error creating icinga service synthetic!app-two-aks: socket hang up')
-        expect(logger.info).toHaveBeenCalledWith('icinga host synthetic: 0 services existing, 1 created, 1 failed')
+        expect(logger.info).toHaveBeenCalledWith('icinga host synthetic: 0 services existing, 1 created, 0 updated, 0 deleted, 1 failed')
+    })
+
+    test('deletes the services managed by synthetic without a configuration', async () => {
+        const c = client({ services: ['app-one-aks', 'old-one-aks', 'old-two-aks'] })
+
+        await icinga.ensureHostAndServices([configuration('app', 'one')], c, 'synthetic')
+
+        expect(c.put).not.toHaveBeenCalled()
+        expect(c.delete.mock.calls).toEqual([
+            ['/objects/services/synthetic!old-one-aks', { params: { cascade: 1 } }],
+            ['/objects/services/synthetic!old-two-aks', { params: { cascade: 1 } }]
+        ])
+        expect(logger.info).toHaveBeenCalledWith('icinga service synthetic!old-one-aks deleted: no monitoring configuration')
+        expect(logger.info).toHaveBeenCalledWith('icinga service synthetic!old-two-aks deleted: no monitoring configuration')
+        expect(logger.info).toHaveBeenCalledWith('icinga host synthetic: 3 services existing, 0 created, 0 updated, 2 deleted, 0 failed')
+    })
+
+    test('never deletes services not created by synthetic', async () => {
+        const c = client({ unmanaged: ['manual-one-aks'] })
+
+        await icinga.ensureHostAndServices([configuration('app', 'one')], c, 'synthetic')
+
+        expect(c.delete).not.toHaveBeenCalled()
+        expect(logger.info).toHaveBeenCalledWith('icinga host synthetic: 1 services existing, 1 created, 0 updated, 0 deleted, 0 failed')
+    })
+
+    test('a service already deleted counts as deleted, other errors as failed', async () => {
+        const del = jest.fn()
+            .mockRejectedValueOnce(notFound())
+            .mockRejectedValueOnce(Object.assign(new Error('403'), { response: { status: 403, data: { status: 'No permission' } } }))
+        const c = client({ services: ['old-one-aks', 'old-two-aks'], del })
+
+        await expect(icinga.ensureHostAndServices([configuration('app', 'one')], c, 'synthetic')).resolves.toBeUndefined()
+
+        expect(logger.error).toHaveBeenCalledWith('error deleting icinga service synthetic!old-two-aks: 403 {"status":"No permission"}')
+        expect(logger.info).toHaveBeenCalledWith('icinga host synthetic: 2 services existing, 1 created, 0 updated, 1 deleted, 1 failed')
     })
 
     test('logs and resolves when icinga is unreachable', async () => {

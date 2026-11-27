@@ -129,8 +129,9 @@ async function execute() {
 
 
 /**
- * prepares icinga before the tests: host and services first, so that the check results find them,
- * then the synthetic nodes of the business process. both never reject
+ * prepares icinga before the tests: host and services first (missing created, changed updated, orphans deleted), so that
+ * the check results find them, then the synthetic nodes of the business process. both never reject.
+ * cron only: it needs all the configurations, a filtered run (queue executor) would delete the other services
  * @param {object[]} configurations configurations about to be tested
  */
 async function icingaBeforeTests(configurations) {
